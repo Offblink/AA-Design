@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>吸附状态机 · AA-Design</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a10; color:#e8eaf0; min-height:100vh;
+  font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+}
+header { padding:32px 24px 8px; max-width:960px; margin:0 auto; }
+header a { color:rgba(232,234,240,0.55); text-decoration:none; font-size:0.85rem; }
+header a:hover { color:#4f8cff; }
+header h1 { font-size:1.5rem; font-weight:700; margin-top:10px; }
+header .src { font-family:Consolas,monospace; font-size:0.75rem; color:rgba(232,234,240,0.4); margin-top:6px; }
+header .src code { color:#7dd3fc; }
+#stage {
+  position:relative; max-width:960px; margin:18px auto 0; height:480px;
+  border-radius:16px; overflow:hidden;
+  background:linear-gradient(160deg,#12161f 0%,#0d1420 55%,#101826 100%);
+  border:1px solid rgba(255,255,255,0.12);
+}
+canvas { display:block; width:100%; height:100%; cursor:grab; }
+canvas.grabbing { cursor:grabbing; }
+.hud {
+  position:absolute; top:14px; right:14px; z-index:3;
+  background:rgba(10,10,16,0.78); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; padding:11px 14px; font-family:Consolas,monospace;
+  font-size:0.72rem; line-height:1.75; color:rgba(232,234,240,0.75);
+  backdrop-filter:blur(18px); min-width:210px;
+}
+.hud b { color:#4f8cff; font-weight:600; }
+.sm {
+  position:absolute; top:14px; left:14px; z-index:3;
+  background:rgba(10,10,16,0.78); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; padding:11px 14px; font-family:Consolas,monospace;
+  font-size:0.72rem; color:rgba(232,234,240,0.7); backdrop-filter:blur(18px);
+}
+.sm .node { display:inline-block; padding:3px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.14); margin:3px 2px; transition:all .2s; }
+.sm .node.on { border-color:#4f8cff; color:#4f8cff; background:rgba(79,140,255,0.14); }
+.sm .arr { color:rgba(232,234,240,0.3); }
+.sm .wt { margin-top:6px; color:rgba(232,234,240,0.45); }
+.sm .wt b { color:#fbbf24; }
+.ctl {
+  position:absolute; bottom:58px; left:50%; transform:translateX(-50%); z-index:3;
+  display:flex; gap:8px; flex-wrap:wrap; justify-content:center; max-width:94%;
+}
+.ctl button {
+  font:inherit; font-size:0.78rem; padding:7px 14px; border-radius:999px; cursor:pointer;
+  color:#e8eaf0; background:rgba(10,10,16,0.75); border:1px solid rgba(255,255,255,0.12);
+  backdrop-filter:blur(18px); transition:all .2s;
+}
+.ctl button:hover { border-color:#4f8cff; color:#4f8cff; }
+.notes { max-width:960px; margin:24px auto 60px; padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px) { .notes { grid-template-columns:1fr; } }
+.notes section {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px; padding:20px 22px; backdrop-filter:blur(18px);
+}
+.notes h2 { font-size:1rem; font-weight:600; color:#4f8cff; margin-bottom:12px; }
+.notes li { font-size:0.85rem; line-height:1.75; color:rgba(232,234,240,0.72); margin:8px 0 8px 18px; }
+.notes code { font-family:Consolas,monospace; font-size:0.78rem; color:#7dd3fc; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>🧲 吸附状态机 — 加权选边 · 冲压挤压 · 回弹归位</h1>
+  <div class="src">源出 <code>wisland/ui/island.py:490 _end_drag()</code>（weights/速度投影）· <code>island.py:615</code>（snap→anchored）· <code>island.py:689-697</code>（冲过边缘挤压）</div>
+</header>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div class="sm" id="sm">
+    <span class="node" id="n-anchored">anchored</span><span class="arr"> → </span>
+    <span class="node" id="n-drag">drag</span><span class="arr"> → </span>
+    <span class="node" id="n-snap">snap</span><span class="arr"> → </span>
+    <span class="node" id="n-anchored2">anchored</span>
+    <div class="wt">选边权重：top/bottom <b>×1.0</b> · left/right <b>×1.35</b>（横向更难吸）</div>
+  </div>
+  <div class="hud" id="hud"></div>
+  <div class="ctl">
+    <button id="throwBtn">🤾 扔向随机边</button>
+    <button id="throwFastBtn">💥 用力扔（看冲压挤压）</button>
+    <button id="resetBtn">↺ 归位</button>
+  </div>
+</div>
+
+<div class="notes">
+  <section>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li>松手不是「回原位」而是<b>吸附到语义上最近的边</b>：给四条边各算 gap、乘权重取最小 —— 交互结果可预期（「丢哪儿贴哪儿」），又用权重表达偏好（横放的胶囊贴左右边少见，×1.35 让它更难选中）。</li>
+      <li><b>速度被继承</b>：gap 弹簧的初速 = 松手瞬间朝边速度的投影（<code>gap.v = -v_toward</code>）—— 甩得越猛冲得越快，动能不丢，这是「物理感」和「玩具感」的分界线。</li>
+      <li><b>冲过边缘不硬停</b>：gap 变负时转成挤压形变（高度压到 62%、宽度 +1.1 倍），把穿透量视觉化成「撞扁了」—— 越界从 bug 变成打击感。</li>
+      <li>回吸用欠阻尼 <code>ratio=0.38</code>（大幅回弹），沿边定位用 <code>ratio=0.74</code>（温和）—— <b>两个轴两种性格</b>：垂直方向表演、水平方向稳定。</li>
+      <li>状态机只有三个状态（anchored → drag → snap → anchored），且 snap 结束的判定是<b>双弹簧同时 rest</b>（<code>island.py:615</code>）—— 状态转移条件全部来自物理量，没有定时器。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>实现要点</h2>
+    <ul>
+      <li>选边：<code>weights = {top:1.0, bottom:1.0, left:1.35, right:1.35}</code>，<code>edge = min(gaps, key=g×weight)</code>（<code>island.py:505-506</code>）。</li>
+      <li>松手三连：<code>along.snap(初值) → along.v=v_along → along.to(clamp, 240, 0.74)</code>；<code>gap.snap(max(-4, 间隙)) → gap.v=-v_toward → gap.to(0, 300, 0.38)</code>（<code>island.py:514-520</code>）。</li>
+      <li>挤压：<code>if g<0: squash=-g</code> → <code>h=max(h×0.62, h-squash)</code>、<code>w+=squash×1.1</code>（<code>island.py:689-697</code>）—— 挤压量就是穿透深度。</li>
+      <li>归位判定：<code>mode=="snap" && along.rest && gap.rest → anchored</code>，随后把 <code>pos_frac</code> 存进 config（<code>island.py:615-626</code>）—— 位置跨重启持久化。</li>
+      <li>换边时旧液桥先 <code>_break_neck()</code> 留水滴（<code>island.py:522-523</code>）；新边 gap &lt; JOIN=30 才重新伸出液桥。</li>
+      <li>along 范围夹取 <code>lo..hi</code> 留出 FILLET+EDGE_MARGIN 边距，胶囊不会顶到屏幕角（<code>island.py:485 _along_range</code>）。</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+"use strict";
+const clamp = (x, lo, hi) => x < lo ? lo : x > hi ? hi : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+
+class Spring {
+  constructor(x, k, ratio, eps = 0.2) {
+    this.x = x; this.v = 0; this.target = x;
+    this.k = k; this.c = 2 * ratio * Math.sqrt(k); this.eps = eps;
+  }
+  to(t, k, ratio) {
+    this.target = t;
+    if (k !== undefined) { this.k = k; this.c = 2 * ratio * Math.sqrt(k); }
+  }
+  snap(x) { this.x = this.target = x; this.v = 0; }
+  get rest() { return Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8; }
+  step(dt) {
+    if (this.rest) { this.x = this.target; this.v = 0; return; }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h; this.x += this.v * h;
+    }
+  }
+}
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const hud = document.getElementById("hud");
+let W = 0, H = 0, DPR = 1;
+const BODY_W = 170, BODY_H = 44, BASE_R = Math.min(BODY_H / 2, BODY_W / 2, 30);
+const EDGE_MARGIN = 6;
+
+// 沿边坐标 s、离边距离 g（每条边各自定义）
+let mode = "anchored";
+let edge = "top";
+const along = new Spring(400, 240, 0.74);   // 沿边定位 k=240/0.74
+const gap = new Spring(0, 300, 0.38);       // 回吸 k=300/0.38 欠阻尼
+// drag 模式用的自由坐标
+const dx = new Spring(400, 900, 0.78);
+const dy = new Spring(200, 900, 0.78);
+let dragVX = 0, dragVY = 0;                 // 松手瞬间速度（近似）
+let squash = 0;
+
+function resize() {
+  const r = cv.parentElement.getBoundingClientRect();
+  DPR = window.devicePixelRatio || 1;
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+
+// 当前几何 → 中心坐标 + 挤压后的尺寸
+function geometry() {
+  let cx, cy, w = BODY_W, h = BODY_H, sq = 0;
+  if (mode === "drag") {
+    cx = dx.x; cy = dy.x;
+  } else {
+    const g = gap.x;
+    sq = Math.max(0, -g);                       // 冲过边缘 → 挤压
+    if (sq > 0) {
+      if (edge === "top" || edge === "bottom") { h = Math.max(h * 0.62, h - sq); w = w + sq * 1.1; }
+      else { w = Math.max(w * 0.62, w - sq); h = h + sq * 1.1; }
+      sq = Math.min(sq, 40);
+    }
+    const gg = Math.max(0, g);
+    const s = clamp(along.x, edgeAlongLo(), edgeAlongHi());
+    if (edge === "top") { cx = s; cy = gg + h / 2; }
+    else if (edge === "bottom") { cx = s; cy = H - gg - h / 2; }
+    else if (edge === "left") { cx = gg + w / 2; cy = s; }
+    else { cx = W - gg - w / 2; cy = s; }
+  }
+  return { cx, cy, w, h, sq };
+}
+function edgeAlongLo() {
+  const g = geometry0();
+  return (edge === "top" || edge === "bottom") ? BODY_W / 2 + 13 + EDGE_MARGIN : BODY_H / 2 + 13 + EDGE_MARGIN;
+}
+function edgeAlongHi() {
+  const g = geometry0();
+  return (edge === "top" || edge === "bottom") ? W - BODY_W / 2 - 13 - EDGE_MARGIN : H - BODY_H / 2 - 13 - EDGE_MARGIN;
+}
+function geometry0() { return { W, H }; }
+
+function gapsOf(cx, cy) {
+  return {
+    top: cy - BODY_H / 2 - 0,
+    bottom: H - (cy + BODY_H / 2),
+    left: cx - BODY_W / 2 - 0,
+    right: W - (cx + BODY_W / 2)
+  };
+}
+const WEIGHTS = { top: 1.0, bottom: 1.0, left: 1.35, right: 1.35 };   // island.py:505
+
+function beginDrag(px, py) {
+  mode = "drag";
+  dx.snap(px); dy.snap(py);
+  dx.to(px); dy.to(py);
+}
+function endDrag() {
+  const cx = dx.x, cy = dy.y;
+  const gaps = gapsOf(cx, cy);
+  // 加权选最近边（island.py:506）
+  edge = Object.keys(gaps).sort((a, b) => gaps[a] * WEIGHTS[a] - gaps[b] * WEIGHTS[b])[0];
+  const horiz = edge === "top" || edge === "bottom";
+  const along0 = horiz ? cx : cy;
+  const vAlong = horiz ? dragVX : dragVY;
+  // 速度投影：朝边缘运动 => gap 减小（island.py:512-513）
+  const vToward = edge === "top" ? dragVY : edge === "bottom" ? -dragVY
+                : edge === "left" ? dragVX : -dragVX;
+  along.snap(along0); along.v = vAlong;
+  along.to(clamp(along0, edgeAlongLo(), edgeAlongHi()), 240, 0.74);
+  gap.snap(Math.max(-4, gaps[edge]));
+  gap.v = -vToward;                            // 继承抛出速度
+  gap.to(0, 300, 0.38);                        // 欠阻尼回吸
+  mode = "snap";
+}
+function settle() {
+  mode = "anchored";
+  gap.snap(0); gap.v = 0;
+}
+
+// —— 交互 ——
+let pointer = null;
+cv.addEventListener("pointerdown", e => {
+  const r = cv.getBoundingClientRect();
+  const px = e.clientX - r.left, py = e.clientY - r.top;
+  const g = geometry();
+  if (Math.abs(px - g.cx) > g.w / 2 + 6 || Math.abs(py - g.cy) > g.h / 2 + 6) return;
+  cv.setPointerCapture(e.pointerId);
+  cv.classList.add("grabbing");
+  beginDrag(px, py);
+  pointer = { x: px, y: py, t: performance.now() };
+});
+cv.addEventListener("pointermove", e => {
+  if (mode !== "drag" || !pointer) return;
+  const r = cv.getBoundingClientRect();
+  const px = e.clientX - r.left, py = e.clientY - r.top;
+  const now = performance.now();
+  const dt = Math.max(1, now - pointer.t) / 1000;
+  dragVX = (px - pointer.x) / dt; dragVY = (py - pointer.y) / dt;
+  pointer = { x: px, y: py, t: now };
+  dx.to(px); dy.to(py);
+});
+function release() {
+  if (mode !== "drag") return;
+  cv.classList.remove("grabbing");
+  pointer = null;
+  endDrag();
+}
+cv.addEventListener("pointerup", release);
+cv.addEventListener("pointercancel", release);
+
+function throwTo(fast) {
+  const edges = ["top", "bottom", "left", "right"];
+  const target = edges[Math.floor(Math.random() * 4)];
+  // 从舞台中心偏一点出发，直接构造 snap（带初速）
+  const cx = W / 2 + (Math.random() - 0.5) * 120;
+  const cy = H / 2 + (Math.random() - 0.5) * 80;
+  const gaps = gapsOf(cx, cy);
+  edge = target;
+  const horiz = target === "top" || target === "bottom";
+  const along0 = horiz ? cx : cy;
+  const speed = fast ? 2600 : 1200;
+  const vToward = speed * (0.85 + Math.random() * 0.5);
+  along.snap(along0); along.v = (Math.random() - 0.5) * 200;
+  along.to(clamp(along0, edgeAlongLo(), edgeAlongHi()), 240, 0.74);
+  gap.snap(Math.max(-4, gaps[target]));
+  gap.v = -vToward;                            // 高速冲向边缘 → 必然冲过 → 挤压
+  gap.to(0, 300, 0.38);
+  mode = "snap";
+}
+document.getElementById("throwBtn").onclick = () => throwTo(false);
+document.getElementById("throwFastBtn").onclick = () => throwTo(true);
+document.getElementById("resetBtn").onclick = () => {
+  edge = "top"; mode = "anchored";
+  gap.snap(0); gap.v = 0;
+  along.snap(clamp(W / 2, edgeAlongLo(), edgeAlongHi())); along.v = 0;
+  along.to(along.x, 240, 0.74);
+};
+
+// —— HUD ——
+function updateSM() {
+  const map = { anchored: ["n-anchored", "n-anchored2"], drag: ["n-drag"], snap: ["n-snap"] };
+  for (const id of ["n-anchored", "n-drag", "n-snap", "n-anchored2"])
+    document.getElementById(id).classList.remove("on");
+  if (mode === "anchored") document.getElementById("n-anchored").classList.add("on");
+  else if (mode === "drag") document.getElementById("n-drag").classList.add("on");
+  else {
+    document.getElementById("n-snap").classList.add("on");
+    if (gap.rest && along.rest) document.getElementById("n-anchored2").classList.add("on");
+  }
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, Math.max(1 / 240, (now - last) / 1000));
+  last = now;
+
+  if (mode === "drag") {
+    // 弹簧跟手（k=900/0.78 保留一点惯性）
+    dx.step(dt); dy.step(dt);
+  } else if (mode === "snap") {
+    gap.step(dt); along.step(dt);
+    if (gap.rest && along.rest) settle();      // island.py:615 双弹簧 rest → anchored
+  } else {
+    along.step(dt);
+  }
+
+  const g = geometry();
+  squash = g.sq;
+
+  // —— 绘制 ——
+  ctx.clearRect(0, 0, W, H);
+
+  // 四条边 + 权重标注
+  const edgeDefs = [
+    ["top", 0, 0, W, 0, "top ×1.0"],
+    ["bottom", 0, H, W, H, "bottom ×1.0"],
+    ["left", 0, 0, 0, H, "left ×1.35"],
+    ["right", W, 0, W, H, "right ×1.35"]
+  ];
+  for (const [name, x1, y1, x2, y2, label] of edgeDefs) {
+    const active = edge === name && mode !== "drag";
+    ctx.strokeStyle = active ? "rgba(79,140,255,0.85)" : "rgba(255,255,255,0.14)";
+    ctx.lineWidth = active ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.font = '10px Consolas, monospace';
+    ctx.fillStyle = active ? "rgba(79,140,255,0.9)" : "rgba(232,234,240,0.3)";
+    ctx.textBaseline = "middle";
+    if (name === "top") { ctx.textAlign = "left"; ctx.fillText(label, 10, 12); }
+    if (name === "bottom") { ctx.textAlign = "left"; ctx.fillText(label, 10, H - 12); }
+    if (name === "left") { ctx.textAlign = "left"; ctx.save(); ctx.translate(12, H - 90); ctx.fillText(label, 0, 0); ctx.restore(); }
+    if (name === "right") { ctx.textAlign = "right"; ctx.fillText(label, W - 10, 90); }
+  }
+
+  // 挤压可视化：穿透深度虚线
+  if (squash > 0.5 && mode === "snap") {
+    ctx.strokeStyle = "rgba(251,146,60,0.7)";
+    ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (edge === "top") { ctx.moveTo(0, 0); ctx.lineTo(W, 0); ctx.moveTo(0, squash); ctx.lineTo(W, squash); }
+    else if (edge === "bottom") { ctx.moveTo(0, H); ctx.lineTo(W, H); ctx.moveTo(0, H - squash); ctx.lineTo(W, H - squash); }
+    else if (edge === "left") { ctx.moveTo(0, 0); ctx.lineTo(0, H); ctx.moveTo(squash, 0); ctx.lineTo(squash, H); }
+    else { ctx.moveTo(W, 0); ctx.lineTo(W, H); ctx.moveTo(W - squash, 0); ctx.lineTo(W - squash, H); }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // 胶囊
+  const x = g.cx - g.w / 2, y = g.cy - g.h / 2;
+  const r = Math.min(g.h / 2, g.w / 2, BASE_R);
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 2;
+  const grad = ctx.createLinearGradient(0, y, 0, y + g.h);
+  grad.addColorStop(0, "rgba(52,58,76,0.85)");
+  grad.addColorStop(1, "rgba(46,52,68,0.9)");
+  ctx.fillStyle = grad;
+  roundRect(ctx, x, y, g.w, g.h, r);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 1;
+  roundRect(ctx, x, y, g.w, g.h, r); ctx.stroke();
+
+  ctx.fillStyle = "rgba(232,234,240,0.92)";
+  ctx.font = '600 15px "HarmonyOS Sans","Segoe UI",sans-serif';
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(mode === "drag" ? "抓住我 → 扔出去" : `贴在 ${edge} 边`, g.cx, g.cy);
+
+  hud.innerHTML =
+    `<b>mode</b>&nbsp;&nbsp; ${mode}<br>` +
+    `<b>edge</b>&nbsp;&nbsp;&nbsp; ${edge} <span style="color:#fbbf24">×${WEIGHTS[edge]}</span><br>` +
+    `<b>gap</b>&nbsp;&nbsp;&nbsp;&nbsp; ${gap.x.toFixed(1)} px <span style="color:rgba(232,234,240,0.4)">(${gap.v.toFixed(0)} px/s)</span><br>` +
+    `<b>squash</b>&nbsp; ${squash > 0.5 ? `<span style="color:#fb923c">${squash.toFixed(1)} px 撞扁</span>` : "—"}<br>` +
+    `<b>along</b>&nbsp;&nbsp; ${along.x.toFixed(0)} <span style="color:${along.rest ? "#34d399" : "#fb923c"}">${along.rest ? "rest" : "·"}</span> / ${gap.rest ? '<span style="color:#34d399">rest</span>' : '<span style="color:#fb923c">·</span>'}`;
+
+  updateSM();
+  requestAnimationFrame(frame);
+}
+function roundRect(p, x, y, w, h, r) {
+  p.beginPath();
+  p.moveTo(x + r, y);
+  p.arcTo(x + w, y, x + w, y + h, r);
+  p.arcTo(x + w, y + h, x, y + h, r);
+  p.arcTo(x, y + h, x, y, r);
+  p.arcTo(x, y, x + w, y, r);
+  p.closePath();
+}
+
+resize();
+along.snap(clamp(W / 2, edgeAlongLo(), edgeAlongHi()));
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

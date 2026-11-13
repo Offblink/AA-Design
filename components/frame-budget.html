@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>帧调度 · AA-Design</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a10; color:#e8eaf0; min-height:100vh;
+  font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+}
+header { padding:32px 24px 8px; max-width:960px; margin:0 auto; }
+header a { color:rgba(232,234,240,0.55); text-decoration:none; font-size:0.85rem; }
+header a:hover { color:#4f8cff; }
+header h1 { font-size:1.5rem; font-weight:700; margin-top:10px; }
+header .src { font-family:Consolas,monospace; font-size:0.75rem; color:rgba(232,234,240,0.4); margin-top:6px; }
+header .src code { color:#7dd3fc; }
+#stage {
+  position:relative; max-width:960px; margin:18px auto 0; height:480px;
+  border-radius:16px; overflow:hidden;
+  background:linear-gradient(160deg,#12161f 0%,#0d1420 55%,#101826 100%);
+  border:1px solid rgba(255,255,255,0.12);
+}
+canvas { display:block; width:100%; height:100%; }
+.hud {
+  position:absolute; top:14px; right:14px; z-index:3;
+  background:rgba(10,10,16,0.78); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; padding:12px 14px; font-family:Consolas,monospace;
+  font-size:0.72rem; line-height:1.8; color:rgba(232,234,240,0.75);
+  backdrop-filter:blur(18px); min-width:230px;
+}
+.hud b { color:#4f8cff; font-weight:600; }
+.hud .big { font-size:1.3rem; color:#e8eaf0; }
+.hud .stop { color:#34d399; } .hud .run { color:#fb923c; }
+.ctl {
+  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
+  display:flex; gap:8px; flex-wrap:wrap; justify-content:center; max-width:94%;
+}
+.ctl button {
+  font:inherit; font-size:0.78rem; padding:7px 14px; border-radius:999px; cursor:pointer;
+  color:#e8eaf0; background:rgba(10,10,16,0.75); border:1px solid rgba(255,255,255,0.12);
+  backdrop-filter:blur(18px); transition:all .2s;
+}
+.ctl button:hover { border-color:#4f8cff; color:#4f8cff; }
+.ctl button.on { border-color:#4f8cff; color:#4f8cff; background:rgba(79,140,255,0.15); }
+.legend {
+  position:absolute; top:14px; left:14px; z-index:3;
+  background:rgba(10,10,16,0.72); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; padding:10px 14px; font-size:0.75rem;
+  color:rgba(232,234,240,0.6); backdrop-filter:blur(18px); max-width:330px; line-height:1.7;
+}
+.legend b { color:#4f8cff; }
+.notes { max-width:960px; margin:24px auto 60px; padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px) { .notes { grid-template-columns:1fr; } }
+.notes section {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px; padding:20px 22px; backdrop-filter:blur(18px);
+}
+.notes h2 { font-size:1rem; font-weight:600; color:#4f8cff; margin-bottom:12px; }
+.notes li { font-size:0.85rem; line-height:1.75; color:rgba(232,234,240,0.72); margin:8px 0 8px 18px; }
+.notes code { font-family:Consolas,monospace; font-size:0.78rem; color:#7dd3fc; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>⏱️ 帧调度 — rest 停帧 · 30/60 分级 · 脏矩形 · 16px 网格</h1>
+  <div class="src">源出 <code>wisland/ui/island.py:614 _needs_frames()</code> · <code>island.py:625 _tick()</code>（16/33ms 分级）· <code>island.py:806</code>（脏矩形）· <code>island.py:918</code>（16px 网格）</div>
+</header>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div class="legend">
+    <b>演示区</b>：胶囊在动时重绘（橙色框 = 本次脏矩形）；弹簧全部 rest 时 <b>rAF 完全停止</b>（绿灯）。空闲呼吸走 <b>30fps</b>，有活动走 <b>60fps</b>。
+  </div>
+  <div class="hud" id="hud"></div>
+  <div class="ctl">
+    <button id="restBtn">😴 触发 rest（停帧）</button>
+    <button id="busyBtn">🎵 模拟忙碌（60fps）</button>
+    <button id="dirtyBtn" class="on">🟧 脏矩形可视化</button>
+    <button id="naiveBtn">🔥 无脑 60fps 对照组</button>
+  </div>
+</div>
+
+<div class="notes">
+  <section>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li><b>静止 = 零开销</b>：所有弹簧 rest 后直接停 rAF。常驻悬浮控件 99% 时间是静止的，每帧空转画一个「不动的动画」是纯浪费。</li>
+      <li><b>30/60 分级</b>：常态圆角呼吸 30fps（33ms）足够顺滑，表情/音乐律动才上 60fps（16ms）—— 按<b>内容的运动速度</b>分配帧预算，不按「有没有动画」一刀切。</li>
+      <li><b>脏矩形</b>：只重绘 old∪new 轮廓 +16px 边距。胶囊在 900×680 窗口里只占一小块，全窗重绘是 10 倍以上的浪费。</li>
+      <li><b>16px 采样网格</b>：毛玻璃截图区域对齐到 16px 网格 —— 轮廓每帧微动时采样区不跟着抖，省掉大量无意义的重截。</li>
+      <li>这些策略叠起来的结论：<b>性能是手感的一部分</b> —— 掉帧的弹性动画比没有动画更糟，所以宁可停帧也不降级画。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>实现要点</h2>
+    <ul>
+      <li><code>_needs_frames()</code>（<code>island.py:614</code>）：拖动 / 有水滴 / 背景在淡入 / 任一弹簧不 rest / 收起态常态动画 —— 全 false 就 <code>timer.stop()</code>。</li>
+      <li>帧率分级在 <code>_tick()</code> 尾部：<code>setInterval(16 if compact.busy() else 33)</code>（<code>island.py:657</code>）—— busy = media/activity/pet/subtitle 模式或切换后 1.4s 内。</li>
+      <li>脏矩形：<code>dirty = old_path ∪ new_path + adjusted(±16)</code>（<code>island.py:806</code>），只对这块 <code>update()</code>。</li>
+      <li>毛玻璃采样按状态降频：移动 40fps、展开 10fps、收起 3fps、参与截图时静止 1~1.5Hz（<code>island.py:922 _request_backdrop()</code>）。</li>
+      <li>截图线程自身还有 <b>1/45s 节流</b>（<code>glass.py:165</code>）—— 被连续唤醒也不会占满 CPU。</li>
+      <li>rest 判据是<b>双条件</b>：位置够近 <b>且</b> 速度够小（<code>|v| &lt; eps×8</code>），防止在目标附近高速穿越时误停。</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+"use strict";
+const clamp = (x, lo, hi) => x < lo ? lo : x > hi ? hi : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+
+class Spring {
+  constructor(x, k, ratio, eps = 0.05) {
+    this.x = x; this.v = 0; this.target = x;
+    this.k = k; this.c = 2 * ratio * Math.sqrt(k); this.eps = eps;
+  }
+  to(t) { this.target = t; }
+  snap(x) { this.x = this.target = x; this.v = 0; }
+  get rest() { return Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8; }
+  step(dt) {
+    if (this.rest) { this.x = this.target; this.v = 0; return; }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h; this.x += a * 0 + this.v * h;
+    }
+  }
+}
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const hud = document.getElementById("hud");
+let W = 0, H = 0, DPR = 1;
+
+const BOX_W = 170, BOX_H = 44;
+const sw = new Spring(BOX_W, 420, 0.62);     // 宽（wisland 尺寸弹簧 k=420/0.62）
+const sh = new Spring(BOX_H, 420, 0.62);
+const fx = new Spring(200, 900, 0.78, 0.2);
+const fy = new Spring(200, 900, 0.78, 0.2);
+let phase = 0;                 // 呼吸相位
+let busy = false;              // 模拟忙碌
+let naive = false;             // 对照组：无脑 60fps
+let showDirty = true;
+let running = true;            // rAF 是否在跑
+let frames = 0, drawnFrames = 0;
+let lastDrawnAt = 0, stoppedAt = 0;
+let dirtyRect = null;
+let fpsWindow = { t: performance.now(), n: 0, drawn: 0 };
+
+function resize() {
+  const r = cv.parentElement.getBoundingClientRect();
+  DPR = window.devicePixelRatio || 1;
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+
+function needsFrames() {
+  // wisland island.py:614 —— 全部 rest 且无常态动画 → 停
+  if (!sw.rest || !sh.rest || !fx.rest || !fy.rest) return true;
+  if (busy) return true;              // 忙碌模式：持续有活动内容
+  if (naive) return true;             // 对照组：无脑跑
+  return false;                       // 收起态常态动画这里也用呼吸表示，但演示里让 rest 真停
+}
+
+function kick() {
+  if (!running) {
+    running = true;
+    stoppedAt = 0;
+    last = performance.now();
+    requestAnimationFrame(frame);
+  }
+}
+
+// —— 交互 ——
+cv.addEventListener("pointerdown", e => {
+  const r = cv.getBoundingClientRect();
+  fx.to(e.clientX - r.left); fy.to(e.clientY - r.top);
+  sw.to(BOX_W + 40); sh.to(BOX_H + 12);
+  kick();
+});
+document.getElementById("restBtn").onclick = () => {
+  // 弹到目标后让所有弹簧立刻 rest —— 观察 rAF 停止
+  fx.snap(fx.target); fy.snap(fy.target); sw.snap(sw.target); sh.snap(sh.target);
+  busy = false; document.getElementById("busyBtn").classList.remove("on");
+  kick();
+};
+document.getElementById("busyBtn").onclick = e => {
+  busy = !busy;
+  e.target.classList.toggle("on", busy);
+  if (busy) kick();
+};
+document.getElementById("dirtyBtn").onclick = e => {
+  showDirty = !showDirty;
+  e.target.classList.toggle("on", showDirty);
+};
+document.getElementById("naiveBtn").onclick = e => {
+  naive = !naive;
+  e.target.classList.toggle("on", naive);
+  if (naive) kick();
+};
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, Math.max(1 / 240, (now - last) / 1000));
+  last = now;
+  frames++;
+
+  // 目标运动
+  if (busy) {
+    phase += dt;
+    fx.target = W / 2 + Math.cos(phase * 1.3) * (W / 2 - 140);
+    fy.target = H / 2 + Math.sin(phase * 2.1) * 90;
+    sw.target = BOX_W + Math.sin(phase * 3) * 24;
+    sh.target = BOX_H + Math.cos(phase * 2.4) * 8;
+  }
+
+  const old = { x: fx.x - sw.x / 2, y: fy.x ? fy.x - sh.x / 2 : 0, w: sw.x, h: sh.x };
+  const oldR = { x: fx.x - sw.x / 2, y: fy.x - sh.x / 2, w: sw.x, h: sh.x };
+
+  fx.step(dt); fy.step(dt); sw.step(dt); sh.step(dt);
+
+  const nx = fx.x - sw.x / 2, ny = fy.x - sh.x / 2, nw = sw.x, nh = sh.x;
+  dirtyRect = {
+    x: Math.min(oldR.x, nx) - 16, y: Math.min(oldR.y, ny) - 16,
+    w: Math.abs(oldR.x - nx) + nw + 32, h: Math.abs(oldR.y - ny) + nh + 32
+  };
+
+  // —— 帧率分级：空闲 30fps / 忙碌 60fps（wisland island.py:657）——
+  const interval = (busy || naive) ? 16 : 33;
+  if (now - lastDrawnAt < interval && !naive) {
+    // 本帧不画（但弹簧已在上面步进过）——等下一帧
+    if (needsFrames()) requestAnimationFrame(frame);
+    else stopLoop(now);
+    return;
+  }
+  lastDrawnAt = now;
+  drawnFrames++;
+
+  // —— rest 停帧判定 ——
+  if (!needsFrames()) {
+    stopLoop(now);
+    return;
+  }
+
+  draw(now, nx, ny, nw, nh);
+  requestAnimationFrame(frame);
+}
+function stopLoop(now) {
+  running = false;
+  stoppedAt = now;
+}
+
+function draw(now, x, y, w, h) {
+  ctx.clearRect(0, 0, W, H);
+
+  // 脏矩形
+  if (showDirty && dirtyRect) {
+    ctx.strokeStyle = "rgba(251,146,60,0.65)";
+    ctx.setLineDash([6, 4]); ctx.lineWidth = 1;
+    ctx.strokeRect(dirtyRect.x, dirtyRect.y, dirtyRect.w, dirtyRect.h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(251,146,60,0.85)";
+    ctx.font = '10px Consolas, monospace';
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillText(`dirty ${Math.round(dirtyRect.w)}×${Math.round(dirtyRect.h)}`, dirtyRect.x + 4, dirtyRect.y + 4);
+    // 全窗对照
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.fillText(`full window ${W}×${H}`, 8, H - 18);
+  }
+
+  // 呼吸圆角（常态动画：wisland fillet ×= 1+0.07 sin(t·1.7)）
+  const fillet = 13 * (1 + 0.07 * Math.sin(now / 1000 * 1.7));
+  const r = Math.min(h / 2, w / 2, 30);
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, "rgba(52,58,76,0.85)");
+  g.addColorStop(1, "rgba(46,52,68,0.9)");
+  ctx.fillStyle = g;
+  roundRect(ctx, x, y, w, h, Math.max(r - (13 - fillet) * 0.4, 6));
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 1;
+  roundRect(ctx, x, y, w, h, Math.max(r - (13 - fillet) * 0.4, 6));
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(232,234,240,0.9)";
+  ctx.font = '600 15px "HarmonyOS Sans","Segoe UI",sans-serif';
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("wisland", x + w / 2, y + h / 2);
+}
+function roundRect(p, x, y, w, h, r) {
+  p.beginPath();
+  p.moveTo(x + r, y);
+  p.arcTo(x + w, y, x + w, y + h, r);
+  p.arcTo(x + w, y + h, x, y + h, r);
+  p.arcTo(x, y + h, x, y, r);
+  p.arcTo(x, y, x + w, y, r);
+  p.closePath();
+}
+
+// —— HUD：fps / 帧计数 / 状态 ——
+function hudTick() {
+  const now = performance.now();
+  const win = now - fpsWindow.t;
+  if (win >= 500) {
+    fpsWindow = { t: now, n: frames, drawn: drawnFrames };
+  }
+  const effFps = (fpsWindow.drawn / (win / 1000)).toFixed(1);
+  const rawFps = (fpsWindow.n / (win / 1000)).toFixed(1);
+  const gap = running ? 0 : ((now - stoppedAt) / 1000);
+  hud.innerHTML =
+    `<b>loop</b>&nbsp;&nbsp;&nbsp;&nbsp; ${running ? '<span class="run">rAF RUNNING</span>' : `<span class="stop">STOPPED ${gap.toFixed(1)}s</span>`}<br>` +
+    `<b>draw fps</b> <span class="big">${running ? effFps : "0"}</span> / ${busy || naive ? 60 : 30} target<br>` +
+    `<b>tick/s</b>&nbsp;&nbsp; ${rawFps}<br>` +
+    `<b>interval</b>&nbsp; ${(busy || naive) ? 16 : 33}ms ${naive ? "(naive)" : busy ? "(busy)" : "(idle)"}<br>` +
+    `<b>springs</b>&nbsp; ${[sw, sh, fx, fy].map(s => s.rest ? "✓" : "·").join(" ")}<br>` +
+    `<b>drawn</b>&nbsp;&nbsp;&nbsp; ${fpsWindow.drawn}/${fpsWindow.n} in 0.5s<br>` +
+    `<b>dirty</b>&nbsp;&nbsp;&nbsp; ${dirtyRect ? Math.round(dirtyRect.w * dirtyRect.h / 1000) + "k px²" : "—"}`;
+  requestAnimationFrame(hudTick);
+}
+
+resize();
+requestAnimationFrame(frame);
+requestAnimationFrame(hudTick);
+</script>
+</body>
+</html>

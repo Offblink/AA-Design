@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🎛️ 控制中心控件 · AA-Design</title>
+<style>
+  :root{
+    --accent:#4f8cff;
+    --text:#e8eaf0;
+    --muted:rgba(232,234,240,0.55);
+    --glass:rgba(255,255,255,0.06);
+    --glass-border:rgba(255,255,255,0.12);
+    /* wisland 暗色主题实测值（theme.py "dark"） */
+    --w-track:rgba(255,255,255,0.133);   /* track (255,255,255,34) */
+    --w-fill:rgba(255,255,255,0.922);    /* fill  (255,255,255,235) */
+    --w-card:rgba(255,255,255,0.102);    /* card  (255,255,255,26) */
+    --w-pill:rgba(255,255,255,0.204);    /* pill  (255,255,255,52) */
+    --w-on:#3b82f6;                      /* on    "#3b82f6" */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:#0a0a10;
+    color:var(--text);
+    font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    min-height:100vh;
+    padding:32px 20px 56px;
+  }
+  header{max-width:920px;margin:0 auto 24px}
+  header a{
+    color:var(--muted);text-decoration:none;font-size:.9rem;
+    border:1px solid var(--glass-border);border-radius:999px;
+    padding:5px 14px;display:inline-block;transition:color .15s,border-color .15s;
+  }
+  header a:hover{color:var(--text);border-color:rgba(255,255,255,0.3)}
+  h1{font-size:1.5rem;font-weight:700;margin:14px 0 6px}
+  .src{font-size:.8rem;color:var(--muted);font-family:Consolas,"Cascadia Mono",monospace}
+  #stage{
+    max-width:920px;margin:0 auto;min-height:480px;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(120% 90% at 50% 0%,rgba(79,140,255,0.10),transparent 60%);
+    border-radius:24px;
+  }
+  /* ── 控制中心面板（玻璃面） ── */
+  .cc{
+    width:560px;max-width:94%;
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+    border:1px solid var(--glass-border);
+    border-radius:16px;
+    padding:22px 24px 16px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .cc-label{font-size:.8rem;color:var(--muted);letter-spacing:.08em}
+  .row{display:flex;gap:12px;align-items:stretch}
+
+  /* ── ① 粗滑块（widgets.py:247 Slider） ── */
+  .slider{
+    position:relative;height:34px;border-radius:999px;
+    background:var(--w-track);cursor:pointer;overflow:hidden;
+    user-select:none;touch-action:none;
+    transform-origin:center;
+  }
+  .slider .fill{
+    position:absolute;left:0;top:0;bottom:0;width:0;
+    background:var(--w-fill);border-radius:999px;pointer-events:none;
+  }
+  .slider .glyph{
+    position:absolute;left:0;top:0;width:34px;height:34px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;color:rgba(255,255,255,0.85);pointer-events:none;
+    transition:color .12s;
+  }
+  .slider .num{
+    position:absolute;right:12px;top:0;height:34px;
+    display:flex;align-items:center;font-size:11.5px;font-weight:500;
+    color:rgba(255,255,255,0.66);pointer-events:none;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ── ② 磁贴（widgets.py:346 Tile） ── */
+  .tile{
+    flex:1;min-width:0;height:52px;border-radius:16px;
+    background:var(--w-card);
+    display:flex;align-items:center;gap:9px;
+    padding:8px;cursor:pointer;user-select:none;
+    transform-origin:center;
+  }
+  .tile .circ{
+    width:36px;height:36px;flex:none;border-radius:50%;
+    background:var(--w-track);
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;color:rgba(255,255,255,0.85);
+  }
+  .tile .meta{min-width:0}
+  .tile .t{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile .s{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile.off .t{opacity:.45}
+  .tile.off .s{opacity:.45}
+
+  /* ── ③ 分段选择（widgets.py:418 Segmented） ── */
+  .seg{
+    position:relative;height:28px;border-radius:999px;
+    background:var(--w-track);cursor:pointer;overflow:hidden;
+    user-select:none;touch-action:none;
+    transform-origin:center;
+  }
+  .seg .pill{
+    position:absolute;top:2px;left:2px;height:24px;
+    background:var(--w-pill);border-radius:999px;pointer-events:none;
+  }
+  .seg .opt{
+    position:absolute;top:0;height:28px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:500;color:rgba(255,255,255,0.6);
+    pointer-events:none;
+  }
+  .seg .opt.sel{color:#fff}
+
+  /* ── 遥测 + 事件日志 ── */
+  .telemetry{
+    font-family:Consolas,"Cascadia Mono",monospace;
+    font-size:11px;color:var(--muted);
+    display:flex;flex-wrap:wrap;gap:4px 18px;
+    border-top:1px dashed rgba(255,255,255,0.10);padding-top:10px;
+  }
+  .telemetry b{color:var(--accent);font-weight:500}
+  .log{
+    font-family:Consolas,"Cascadia Mono",monospace;
+    font-size:11px;color:rgba(232,234,240,0.42);
+    display:flex;flex-direction:column;gap:3px;min-height:66px;
+  }
+  .log .new{color:var(--text)}
+
+  /* ── notes ── */
+  .notes{max-width:920px;margin:28px auto 0}
+  .notes h2{font-size:1rem;font-weight:600;color:var(--accent);margin:18px 0 8px}
+  .notes li{list-style:none;font-size:.9rem;line-height:1.75;color:rgba(232,234,240,0.8);
+    padding-left:16px;position:relative}
+  .notes li::before{content:"·";position:absolute;left:2px;color:var(--accent)}
+  .notes code{font-family:Consolas,monospace;font-size:.84em;color:var(--accent);
+    background:rgba(79,140,255,0.10);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>🎛️ 控制中心控件</h1>
+  <div class="src">wisland/ui/widgets.py:247 Slider() · :346 Tile() · :418 Segmented() · :91 Hoverable.press_scale()</div>
+</header>
+
+<div id="stage">
+  <div class="cc">
+    <div class="cc-label">亮度</div>
+
+    <!-- ① 粗滑块 -->
+    <div class="slider" id="slider">
+      <div class="fill" id="sliderFill"></div>
+      <div class="glyph" id="sliderGlyph">☀</div>
+      <div class="num" id="sliderNum">0</div>
+    </div>
+
+    <!-- ② 磁贴 -->
+    <div class="row">
+      <div class="tile" id="tileBt">
+        <div class="circ">ᛒ</div>
+        <div class="meta"><div class="t">蓝牙</div><div class="s">关闭</div></div>
+      </div>
+      <div class="tile" id="tileWifi">
+        <div class="circ">📶</div>
+        <div class="meta"><div class="t">无线局域网</div><div class="s">关闭</div></div>
+      </div>
+    </div>
+
+    <!-- ③ 分段选择 -->
+    <div class="cc-label">外观</div>
+    <div class="seg" id="seg">
+      <div class="pill" id="segPill"></div>
+    </div>
+
+    <div class="telemetry" id="telemetry"></div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<section class="notes">
+  <h2>为什么值得借鉴</h2>
+  <ul>
+    <li>图标对比度翻转：白色填充越过左侧图标时图标立刻变深色、越过右端数值时数值也变深——任何填充比例下前景都保持可读，不需要为"半填充"状态单独设计中间色。</li>
+    <li>整条轨道可点击可拖：iOS 控制中心的肌肉记忆是"点哪儿跳哪儿"，不必先抓住一个小把手，粗滑块（34px 高）让触控目标足够大。</li>
+    <li>滑块不响应滚轮：<code>wheelEvent</code> 直接 <code>e.ignore()</code> 交给外层——指针停在滑块上时页面仍能正常滚动，避免"光标落进控件就滚不动页"的经典陷阱。</li>
+    <li>磁贴颜色用弹簧插值而非硬切：关闭→打开时圆底从灰弹簧过渡到蓝，图标在 t&gt;0.5 时翻白，过渡中途任何一帧对比度都够。</li>
+    <li>分段底块"弹"过去而不是淡入淡出：位移本身即状态指示，眼睛跟着底块走，选中项的归属一目了然。</li>
+    <li>统一的按压缩放（1 − 0.06×press）：所有控件共享同一对 hover/press 弹簧，按下有"被按进去"的触感，松手回弹，交互语言一致。</li>
+  </ul>
+
+  <h2>实现要点</h2>
+  <ul>
+    <li>弹簧类移植自 <code>anim.py Spring</code>：阻尼 <code>c = 2·ratio·√k</code>，积分 <code>a = −k(x−target) − c·v</code>，按 1/240s 子步进；静止判定 <code>|x−target|&lt; eps 且 |v| &lt; eps·8</code>。</li>
+    <li>滑块数值弹簧 <code>shown = Spring(0, k=520, ratio=1.0, eps=0.002)</code>；填充宽 <code>max(height, width·v)</code>（v&gt;0 时至少留出一个圆高）；图标翻转阈值 <code>v·width &gt; height·0.8</code>，数值翻转阈值 <code>v &gt; 0.9</code>；按下点 x &lt; height·0.9 视为图标点击而非拖动。</li>
+    <li>磁贴：高 52、圆角 16、图标圆直径 <code>d = height − 16 = 36</code>；<code>on_spring = Spring(0, k=380, ratio=0.85, eps=0.005)</code>；圆底颜色在 track(255,255,255,34) → on #3b82f6 之间按 t 线性插值（含 alpha），图标 <code>t &gt; 0.5</code> 翻白；副标题两级文字 12.5px/11px，off 时整体 0.45 透明度。</li>
+    <li>分段：高 28，底块 <code>x = cw·pos + 2</code>、宽 <code>cw − 4</code>、圆角取自身高一半；<code>pos = Spring(0, k=520, ratio=0.72, eps=0.002)</code>，源码用 16ms 定时器固定 <code>step(0.016)</code>，ratio 0.72 让底块越过目标后回弹一次再停。</li>
+    <li>hover/press 弹簧来自 <code>Hoverable</code>：<code>hover = Spring(0, 420, 1.0, 0.01)</code>、<code>press = Spring(0, 600, 0.7, 0.01)</code>，<code>press_scale = 1 − 0.06·press.x</code>；磁贴在 wisland 中直接继承 Hoverable，本演示把同一对弹簧接到滑块与分段上，三个控件反馈一致。</li>
+    <li>全部动画走自写 <code>requestAnimationFrame</code> 循环：任何弹簧 <code>to()</code> 唤醒循环，全部 rest 后停帧；无任何动画库。</li>
+  </ul>
+</section>
+
+<script>
+"use strict";
+/* ══════════ Spring（移植 wisland/ui/anim.py Spring） ══════════ */
+function clamp(x, lo, hi){ return x < lo ? lo : x > hi ? hi : x; }
+class Spring {
+  constructor(x, k, ratio, eps){
+    this.x = x; this.v = 0; this.target = x;
+    this.k = k; this.c = 2 * ratio * Math.sqrt(k); this.eps = eps;
+  }
+  to(t){ this.target = t; ensureLoop(); }
+  get rest(){ return Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8; }
+  step(dt){
+    if (this.rest){ this.x = this.target; this.v = 0; return; }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;
+    for (let i = 0; i < n; i++){
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h;
+      this.x += this.v * h;
+    }
+  }
+}
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* ══════════ 全局 rAF 循环 ══════════ */
+let running = false, last = 0;
+function ensureLoop(){
+  if (running) return;
+  running = true; last = performance.now();
+  requestAnimationFrame(frame);
+}
+function frame(now){
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  let awake = false;
+  for (const s of SPRINGS){ s.step(dt); if (!s.rest) awake = true; }
+  render();
+  if (awake) requestAnimationFrame(frame);
+  else running = false;
+}
+const SPRINGS = [];
+const reg = s => { SPRINGS.push(s); return s; };
+
+/* ══════════ 事件日志 ══════════ */
+const logEl = document.getElementById("log");
+function log(msg){
+  const old = logEl.querySelector(".new");
+  if (old) old.classList.remove("new");
+  const div = document.createElement("div");
+  div.textContent = msg; div.className = "new";
+  logEl.prepend(div);
+  while (logEl.children.length > 4) logEl.lastChild.remove();
+}
+
+/* ══════════ ① 粗滑块（widgets.py:247 Slider） ══════════ */
+const sliderEl   = document.getElementById("slider");
+const fillEl     = document.getElementById("sliderFill");
+const glyphEl    = document.getElementById("sliderGlyph");
+const numEl      = document.getElementById("sliderNum");
+const H = 34;                       // Slider(height=34)
+const shown  = reg(new Spring(0, 520, 1.0, 0.002));   // Spring(0,520,1.0,0.002)
+const sHover = reg(new Spring(0, 420, 1.0, 0.01));
+const sPress = reg(new Spring(0, 600, 0.7, 0.01));
+let value = 0, dragging = false, iconPress = false;
+
+sliderEl.addEventListener("pointerdown", e => {
+  const x = e.offsetX;
+  if (x < H * 0.9){                 // mousePressEvent: x < height*0.9 → 图标区
+    iconPress = true;
+    log("滑块 按下图标区 x=" + Math.round(x) + " < 34×0.9 → 不进入拖动");
+    sPress.to(1);
+    return;
+  }
+  iconPress = false; dragging = true;
+  sliderEl.setPointerCapture(e.pointerId);
+  value = clamp(x / sliderEl.clientWidth, 0, 1);
+  shown.to(value);
+  sPress.to(1);
+  log("滑块 按下 x=" + Math.round(x) + " → 开始拖动 v=" + value.toFixed(2));
+});
+sliderEl.addEventListener("pointermove", e => {
+  if (!dragging) return;
+  value = clamp(e.offsetX / sliderEl.clientWidth, 0, 1);
+  shown.to(value);
+});
+sliderEl.addEventListener("pointerup", e => {
+  sPress.to(0);
+  if (iconPress){ iconPress = false; log("滑块 松开图标区 → icon_clicked() 信号"); return; }
+  if (dragging){ dragging = false; log("滑块 松开 → released(" + value.toFixed(2) + ")"); }
+});
+sliderEl.addEventListener("pointerleave", () => { sHover.to(0); if (!dragging) sPress.to(0); });
+sliderEl.addEventListener("pointerenter", () => sHover.to(1));
+/* wheelEvent: e.ignore() —— 不 preventDefault，滚轮原样交给外层页面滚动 */
+let lastWheel = -Infinity;
+sliderEl.addEventListener("wheel", () => {
+  const now = performance.now();
+  if (now - lastWheel < 600) return;
+  lastWheel = now;
+  log("滑块 wheel → e.ignore()，值不变，交给外层");
+}, { passive: true });
+
+/* ══════════ ② 磁贴（widgets.py:346 Tile） ══════════ */
+const TRACK = [255, 255, 255, 34];   // theme.track (255,255,255,34)
+const ON    = [59, 130, 246, 255];   // theme.on   "#3b82f6"
+function makeTile(id, glyph, offSub, onSub){
+  const el = document.getElementById(id);
+  const circ = el.querySelector(".circ");
+  circ.textContent = glyph;
+  const t = {
+    el, circ, sub: el.querySelector(".s"),
+    on: false, offSub, onSub,
+    spring: reg(new Spring(0, 380, 0.85, 0.005)),   // Spring(0,380,0.85,0.005)
+    hover:  reg(new Spring(0, 420, 1.0, 0.01)),
+    press:  reg(new Spring(0, 600, 0.7, 0.01)),
+  };
+  el.addEventListener("pointerenter", () => t.hover.to(1));
+  el.addEventListener("pointerleave", () => { t.hover.to(0); t.press.to(0); });
+  el.addEventListener("pointerdown", () => t.press.to(1));
+  el.addEventListener("pointerup", () => {
+    t.press.to(0);
+    t.on = !t.on;
+    t.spring.to(t.on ? 1 : 0);
+    t.sub.textContent = t.on ? t.onSub : t.offSub;
+    el.classList.toggle("off", !t.on);
+    log("磁贴 " + t.el.querySelector(".t").textContent + " → on=" + t.on);
+  });
+  return t;
+}
+const tiles = [
+  makeTile("tileBt",   "ᛒ", "关闭", "已连接 2 台设备"),
+  makeTile("tileWifi", "📶", "关闭", "Wi-Fi 已连接"),
+];
+
+/* ══════════ ③ 分段选择（widgets.py:418 Segmented） ══════════ */
+const segEl   = document.getElementById("seg");
+const segPill = document.getElementById("segPill");
+const OPTS = ["日间", "夜间", "自动"];
+const pos   = reg(new Spring(0, 520, 0.72, 0.002));  // Spring(0,520,0.72,0.002)
+const gHover = reg(new Spring(0, 420, 1.0, 0.01));
+const gPress = reg(new Spring(0, 600, 0.7, 0.01));
+let segIndex = 0;
+const optEls = OPTS.map((name, i) => {
+  const d = document.createElement("div");
+  d.className = "opt" + (i === 0 ? " sel" : "");
+  d.textContent = name;
+  segEl.appendChild(d);
+  return d;
+});
+segEl.addEventListener("pointerenter", () => gHover.to(1));
+segEl.addEventListener("pointerleave", () => { gHover.to(0); gPress.to(0); });
+segEl.addEventListener("pointerdown", () => gPress.to(1));
+segEl.addEventListener("pointerup", e => {
+  gPress.to(0);
+  const cw = segEl.clientWidth / OPTS.length;
+  const i = clamp(Math.floor(e.offsetX / cw), 0, OPTS.length - 1);
+  if (i !== segIndex){
+    segIndex = i;
+    pos.to(i);                        // set_index → pos_.to(i)
+    optEls.forEach((d, j) => d.classList.toggle("sel", j === i));
+    log("分段 选中 " + i + "「" + OPTS[i] + "」→ 弹簧滑动 k=520 ratio=0.72");
+  } else {
+    log("分段 点击「" + OPTS[i] + "」已是当前项");
+  }
+});
+
+/* ══════════ 渲染 ══════════ */
+const telEl = document.getElementById("telemetry");
+function render(){
+  const w = sliderEl.clientWidth;
+  /* 滑块 */
+  const v = clamp(shown.x, 0, 1);
+  const fillW = v > 0 ? Math.max(H, w * v) : 0;
+  fillEl.style.width = fillW + "px";
+  glyphEl.style.color = (v * w > H * 0.8)
+    ? "#1e1e22"                                 // 填充上：深色
+    : "rgba(255,255,255,0.85)";                 // 轨道上：主题色
+  numEl.textContent = String(Math.round(v * 100));
+  numEl.style.color = v > 0.9 ? "rgba(30,30,34,0.67)" : "rgba(255,255,255,0.66)";
+  sliderEl.style.transform = "scale(" + (1 - 0.06 * sPress.x).toFixed(4) + ")";
+
+  /* 磁贴 */
+  for (const t of tiles){
+    const k = clamp(t.spring.x, 0, 1);
+    const c = TRACK.map((a, i) => Math.round(lerp(a, ON[i], k)));
+    t.circ.style.backgroundColor = "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (c[3] / 255).toFixed(3) + ")";
+    t.circ.style.color = k > 0.5 ? "#ffffff" : "rgba(255,255,255,0.85)";   // t>0.5 翻白
+    t.el.style.backgroundColor = "rgba(255,255,255," + (0.102 * (1 + 0.5 * t.hover.x)).toFixed(3) + ")";
+    t.el.style.transform = "scale(" + (1 - 0.06 * t.press.x).toFixed(4) + ")";
+  }
+
+  /* 分段 */
+  const cw = segEl.clientWidth / OPTS.length;
+  segPill.style.width = (cw - 4) + "px";
+  segPill.style.height = "24px";
+  segPill.style.transform = "translateX(" + (cw * pos.x) + "px)";
+  optEls.forEach((d, i) => {
+    d.style.left = (cw * i) + "px";
+    d.style.width = cw + "px";
+  });
+  segEl.style.transform = "scale(" + (1 - 0.06 * gPress.x).toFixed(4) + ")";
+
+  /* 遥测 */
+  telEl.innerHTML =
+    "<span>滑块 shown=<b>" + v.toFixed(3) + "</b></span>" +
+    "<span>磁贴 t=<b>" + tiles.map(t => clamp(t.spring.x, 0, 1).toFixed(2)).join("/") + "</b></span>" +
+    "<span>分段 pos=<b>" + pos.x.toFixed(3) + "</b>/" + segIndex + "</span>" +
+    "<span>press×滑块 <b>" + (1 - 0.06 * sPress.x).toFixed(3) + "</b></span>";
+}
+render();
+log("就绪：拖动滑块 / 点磁贴 / 点分段，滚到滑块上滚轮仍可滚页");
+</script>
+</body>
+</html>

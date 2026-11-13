@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>🔔 活动提示 · AA-Design</title>
+<style>
+  :root{
+    --accent:#4f8cff;
+    --text:#e8eaf0;
+    --dim:rgba(232,234,240,0.55);
+    --glass:rgba(255,255,255,0.06);
+    --line:rgba(255,255,255,0.12);
+    --font:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    --mono:Consolas,"Cascadia Mono","Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#0a0a10;color:var(--text);font-family:var(--font);line-height:1.65}
+  header{max-width:960px;margin:0 auto;padding:26px 20px 6px}
+  a.back{display:inline-block;color:var(--dim);text-decoration:none;font-size:.85rem;border:1px solid var(--line);
+    background:var(--glass);border-radius:999px;padding:4px 14px;transition:border-color .18s,color .18s}
+  a.back:hover{color:var(--accent);border-color:rgba(79,140,255,.55)}
+  h1{font-size:1.5rem;font-weight:700;margin:12px 0 4px;line-height:1.3}
+  .src{font-size:.76rem;color:var(--dim);font-family:var(--mono);word-break:break-all}
+
+  /* ---------- 演示舞台 ---------- */
+  #stage{
+    position:relative;overflow:hidden;
+    max-width:960px;margin:18px auto 0;min-height:500px;
+    display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:16px;
+    padding:30px 18px 22px;border-radius:16px;
+    background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid var(--line);
+  }
+  .blob{position:absolute;border-radius:50%;filter:blur(64px);opacity:.55;pointer-events:none}
+  .b1{width:340px;height:300px;background:#1d4ed8;left:6%;top:4%}
+  .b2{width:300px;height:280px;background:#6d28d9;right:8%;bottom:26%}
+  .b3{width:200px;height:180px;background:#0e7490;left:38%;bottom:4%;opacity:.4}
+
+  .island-area{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;width:100%}
+
+  /* 收起态胶囊（wisland 灵动岛收起态） */
+  #pill{
+    position:relative;width:150px;height:34px;border-radius:999px;overflow:hidden;
+    background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid var(--line);
+    box-shadow:0 18px 42px rgba(0,0,0,.5);
+    will-change:width,height;
+  }
+  #idleLayer{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em;
+  }
+  #actLayer{position:absolute;inset:0;opacity:0}
+  #actIcon{
+    position:absolute;left:9px;top:50%;margin-top:-13px;width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;transform-origin:50% 50%;
+  }
+  #actGlyph{
+    font-family:"Segoe Fluent Icons","Segoe MDL2 Assets","Segoe UI Emoji",sans-serif;
+    font-size:16px;line-height:1;white-space:nowrap;
+  }
+  #actText{
+    position:absolute;left:45px;top:0;height:100%;display:flex;align-items:center;gap:10px;
+    white-space:nowrap;transform-origin:0 50%;
+  }
+  #actTitle{font-size:13px;font-weight:600}
+  #actSub{font-size:12px;font-weight:400;color:rgba(232,234,240,.66)}
+  #volTrack{
+    position:absolute;left:45px;right:52px;top:50%;margin-top:-3px;height:6px;border-radius:3px;
+    background:rgba(255,255,255,.13);display:none;
+  }
+  #volFill{height:100%;width:6px;border-radius:3px;background:rgba(232,234,240,.92)}
+  #volVal{
+    position:absolute;right:14px;width:34px;top:0;height:100%;display:none;
+    align-items:center;justify-content:flex-end;
+    font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;
+  }
+
+  /* ---------- 状态读数 ---------- */
+  .hud{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .chip{font-size:.76rem;color:var(--dim);background:var(--glass);border:1px solid var(--line);
+    border-radius:999px;padding:3px 12px;white-space:nowrap}
+  .chip b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums;margin-left:4px}
+  #sNote{font-size:.74rem;color:var(--dim);font-family:var(--mono);text-align:center;min-height:1.2em}
+  .log{font-family:var(--mono);font-size:.73rem;color:var(--dim);text-align:center;min-height:64px;line-height:1.55}
+  .log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .log .in{color:#8fb8ff}
+  .log .up{color:#5fd3a4}
+
+  /* ---------- 控制区 ---------- */
+  .controls{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:12px;width:100%}
+  .btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  button{
+    font:inherit;font-size:.88rem;color:var(--text);
+    background:var(--glass);border:1px solid var(--line);border-radius:999px;
+    padding:9px 18px;cursor:pointer;
+    transition:border-color .18s,background .18s,transform .1s;
+  }
+  button:hover{background:rgba(79,140,255,.16);border-color:rgba(79,140,255,.55)}
+  button:active{transform:translateY(1px)}
+  .volrow{display:flex;flex-wrap:wrap;align-items:center;gap:14px;justify-content:center;font-size:.82rem;color:var(--dim)}
+  .volrow label{display:flex;align-items:center;gap:8px}
+  input[type=range]{accent-color:var(--accent);width:190px;cursor:pointer}
+  .volrow .chk{cursor:pointer;user-select:none}
+  .hint{font-size:.76rem;color:var(--dim)}
+  .hint code{font-family:var(--mono);font-size:.95em}
+
+  /* ---------- 说明 ---------- */
+  .notes{
+    max-width:960px;margin:28px auto 64px;padding:0 20px;
+    display:grid;grid-template-columns:1fr 1fr;gap:26px;
+  }
+  .notes h2{font-size:1rem;font-weight:600;color:var(--accent);margin:0 0 10px}
+  .notes ul{margin:0;padding-left:1.15em}
+  .notes li{margin:8px 0;font-size:.89rem;color:rgba(232,234,240,.78)}
+  .notes li b{color:var(--text);font-weight:600}
+  code{font-family:var(--mono);font-size:.86em;color:#8fb8ff;background:rgba(79,140,255,.12);
+    padding:1px 5px;border-radius:6px}
+  @media (max-width:760px){.notes{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="../index.html">← 画廊</a>
+  <h1>🔔 活动提示</h1>
+  <div class="src">wisland/ui/compact.py:363 show_activity() · :369 update_activity() · :387 mode() · :407 size_hint() · :660 _paint_activity()｜wisland/app.py:57 on_translated · :247 on_volume · :284 on_notified · :307 on_stock_alert</div>
+</header>
+
+<div id="stage">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+
+  <div class="island-area">
+    <div id="pill">
+      <div id="idleLayer">21:34</div>
+      <div id="actLayer">
+        <div id="actIcon"><span id="actGlyph"></span></div>
+        <div id="actText"><span id="actTitle"></span><span id="actSub"></span></div>
+        <div id="volTrack"><div id="volFill"></div></div>
+        <div id="volVal"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="chips">
+      <span class="chip">模式<b id="sMode">idle</b></span>
+      <span class="chip">类型<b id="sType">—</b></span>
+      <span class="chip">尺寸<b id="sSize">150×34</b></span>
+      <span class="chip">剩余<b id="sLeft">—</b></span>
+      <span class="chip">入场<b id="sEnter">0 / 0</b></span>
+    </div>
+    <div id="sNote">idle 150×34</div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="controls">
+    <div class="btns">
+      <button id="btnMsg">💬 消息 · QQ</button>
+      <button id="btnVol">🔊 音量提示</button>
+      <button id="btnTr">🌐 翻译结果</button>
+      <button id="btnStk">📈 股票提醒</button>
+    </div>
+    <div class="volrow">
+      <label>音量 <input type="range" id="volSlider" min="0" max="100" value="62"/></label>
+      <label class="chk"><input type="checkbox" id="volMute"/> 静音</label>
+      <span class="hint">拖滑杆 → <code>update_activity</code> 原地续期 1.8s，不重新入场</span>
+    </div>
+  </div>
+</div>
+
+<section class="notes">
+  <div>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li><b>插队但不赖台</b>：<code>mode()</code> 先判 activity（<code>now &lt; until</code>）再判字幕 / 媒体 / 常态，到期自动把视图还回去——提示不需要用户点「知道了」（compact.py:387）。</li>
+      <li><b>连续事件只续期、不重播</b>：<code>update_activity</code> 原地改字典并把 <code>until</code> 续到 now+1.8s；连调音量时图标圆不会反复缩放、进度条不闪（compact.py:369 注释「原地更新（例如连续调音量时不重新入场）」）。</li>
+      <li><b>时长跟内容长度走</b>：翻译结果停留 <code>3.5 + len×0.12</code> 秒、封顶 12（app.py:57），短句一闪、长句读得完；消息 4s、股票 5s、音量 1.8s 按信息寿命各定（app.py:285 / :308 / :249）。</li>
+      <li><b>宽高有硬界</b>：文本活动 <code>clamp(70+标题宽+副文宽+24, 220, 460)×40</code>，音量 / 亮度恒 280×40（compact.py:410-417）——内容再长也不会把胶囊撑出屏幕。</li>
+      <li><b>来源色画在图标圆上</b>：QQ <code>#12b7f5</code>、微信 <code>#07c160</code>、邮件 <code>#ff9f0a</code>（theme.py:265 KIND_COLORS），不读文字也能认出是谁；股票把涨跌色同时上圆和副文（app.py:307）。</li>
+      <li><b>淡出即走、不打断</b>：模式切换 0.28s ease_out 交叉淡入（compact.py:434），提示结束回到原视图，全程没有模态弹窗。</li>
+    </ul>
+  </div>
+  <div>
+    <h2>实现要点</h2>
+    <ul>
+      <li><b>双时间常数</b>：入场 <code>enter = ease_out((now-start)/0.35)</code>（compact.py:664）驱动图标圆缩放与音量条填充 <code>max(6, bw×v×enter)</code>（compact.py:695）；整层 alpha 用模式淡入 0.28s（compact.py:434）。<code>ease_out = 1-(1-t)³</code>（anim.py:62）。</li>
+      <li><b>版式常量</b>：胶囊高 <code>H_ACT=40</code>（compact.py:20）、图标圆 d=26 距左 9（:667-668）、文字起点 x=45=9+26+10（:686）、副文紧跟标题 +10（:717）。</li>
+      <li><b>文本层级</b>：标题 13px DemiBold 过长 ElideRight；副文 12px 且只在「标题宽+10 &lt; 可用宽」时绘制；<code>title_color</code>/<code>sub_color</code> 可分别覆盖（compact.py:704-719）。</li>
+      <li><b>音量条</b>：轨道 x=45 起、右端留 52、高 6 圆角 3（:689-693）；数值 12.5px DemiBold 右对齐、右缘距胶囊右 14（:696-698）；静音时显示「静音」而不是数字。</li>
+      <li><b>数据即状态</b>：<code>show_activity</code> 把 <code>until = now+duration</code>、<code>start = now</code> 存进 dict（:363-367）；<code>island.activity()</code> 默认 2.4s（island.py:451）；音量续期直接传 <code>until=now+1.8</code>（app.py:247）。</li>
+      <li><b>本页实现</b>：rAF 循环里胶囊尺寸用弹簧插值逼近目标、模式 alpha 走 0.28s、入场细节走 0.35s；用 canvas <code>measureText</code> 按 13/12px 复算标题副文宽度得 size_hint，与 Qt <code>QFontMetrics.horizontalAdvance</code> 同口径。</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ===== wisland 动画原语（anim.py:53/62）===== */
+  function clamp(x, lo, hi){ return x < lo ? lo : (x > hi ? hi : x); }
+  function easeOut(t){ t = clamp(t, 0, 1); return 1 - Math.pow(1 - t, 3); }
+
+  /* ===== 常量（compact.py:18-23）===== */
+  var H_ACT = 40, H_IDLE = 34, IDLE_W = 150;
+  var T_MODE = 0.28;   // compact.py:434 模式交叉淡入
+  var T_ENTER = 0.35;  // compact.py:664 入场
+  var FONT = '"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+  var F_TITLE = '600 13px ' + FONT;   // compact.py:704 ui_font(13, DemiBold)
+  var F_SUB   = '400 12px ' + FONT;   // compact.py:713 ui_font(12)
+
+  /* ===== Segoe Fluent Icons 码位（theme.py:12-51）===== */
+  var GLYPH = {
+    MESSAGE:'\uE8BD', MAIL:'\uE715', CHAT:'\uE8F2', STOCK:'\uEAFC',
+    TRANSLATE:'\uF2B7', VOLUME:'\uE767', MUTE:'\uE74F', BELL:'\uEA8F'
+  };
+
+  /* ===== KIND_COLORS（theme.py:265-271）+ 涨跌色（theme.py:90）===== */
+  var KIND = {
+    qq:     { color:'#12b7f5', glyph:GLYPH.CHAT,    title:'QQ · 小冰',        sub:'新消息' },
+    wechat: { color:'#07c160', glyph:GLYPH.MESSAGE, title:'微信 · 家庭群',    sub:'周予' },
+    mail:   { color:'#ff9f0a', glyph:GLYPH.MAIL,    title:'邮件 · GitHub',    sub:'新邮件' }
+  };
+  var KIND_ORDER = ['qq','wechat','mail'];
+  var UP_COLOR = '#ff5a52', DOWN_COLOR = '#35c98e';   // A 股习惯：红涨（theme.py:243/246）
+
+  /* ===== DOM ===== */
+  var pill = $('pill'), idleLayer = $('idleLayer'), actLayer = $('actLayer');
+  var actIcon = $('actIcon'), actGlyph = $('actGlyph'), actText = $('actText');
+  var actTitle = $('actTitle'), actSub = $('actSub');
+  var volTrack = $('volTrack'), volFill = $('volFill'), volVal = $('volVal');
+  var sMode = $('sMode'), sType = $('sType'), sSize = $('sSize'), sLeft = $('sLeft'),
+      sEnter = $('sEnter'), sNote = $('sNote'), logEl = $('log');
+  var btnMsg = $('btnMsg'), btnVol = $('btnVol'), btnTr = $('btnTr'), btnStk = $('btnStk');
+  var volSlider = $('volSlider'), volMute = $('volMute');
+
+  /* ===== 文本测量（等价 QFontMetrics.horizontalAdvance）===== */
+  var mctx = document.createElement('canvas').getContext('2d');
+  function measure(font, text){
+    if (!text) return 0;
+    mctx.font = font;
+    return mctx.measureText(text).width;
+  }
+  function elide(font, text, maxW){
+    mctx.font = font;
+    if (mctx.measureText(text).width <= maxW) return text;
+    var chars = Array.from(text), s = '';
+    for (var i = 0; i < chars.length; i++){
+      if (mctx.measureText(s + chars[i] + '\u2026').width > maxW) break;
+      s += chars[i];
+    }
+    return s + '\u2026';
+  }
+
+  /* ===== 活动状态（compact.py:363-372）===== */
+  var act = null;            // { data, start, until, duration, n, type, expired, expT }
+  var enterSeq = 0, totalEnter = 0;
+  var lastMode = 'idle', modeT = -10;
+  var nowSec = function(){ return performance.now() / 1000; };
+
+  function logLine(cls, text){
+    var d = new Date();
+    var hh = String(d.getHours()).padStart(2,'0'),
+        mm = String(d.getMinutes()).padStart(2,'0'),
+        ss = String(d.getSeconds()).padStart(2,'0');
+    var div = document.createElement('div');
+    div.className = cls || '';
+    div.textContent = hh + ':' + mm + ':' + ss + '  ' + text;
+    logEl.insertBefore(div, logEl.firstChild);
+    while (logEl.children.length > 4) logEl.removeChild(logEl.lastChild);
+  }
+
+  function typeLabel(d){
+    if (d.type === 'volume') return 'volume';
+    if (d.type === 'message') return 'message/' + (d.kind || 'other');
+    if (d.type === 'translate') return 'translate';
+    if (d.type === 'stock') return 'stock/' + (d.dir || '');
+    return 'activity';
+  }
+
+  function applyDom(){
+    var d = act.data;
+    prev.title = prev.sub = prev.val = null;   // 内容换了，渲染缓存作废
+    var isVol = d.type === 'volume';
+    // 图标圆（compact.py:667-685：d=26，有色圆白字 13px，无色 16px）
+    if (d.color){
+      actIcon.style.background = d.color;
+      actGlyph.style.fontSize = '13px';
+      actGlyph.style.color = '#ffffff';
+    } else {
+      actIcon.style.background = 'transparent';
+      actGlyph.style.fontSize = '16px';
+      actGlyph.style.color = '#e8eaf0';
+    }
+    actGlyph.textContent = d.glyph || GLYPH.BELL;
+    // 文本 or 音量条（compact.py:687 二选一）
+    actText.style.display = isVol ? 'none' : 'flex';
+    volTrack.style.display = isVol ? 'block' : 'none';
+    volVal.style.display = isVol ? 'flex' : 'none';
+    if (isVol){
+      volVal.textContent = d.muted ? '静音' : String(Math.round(d.value * 100));  // compact.py:698-700
+    } else {
+      var title = d.title || '', sub = d.sub || '';
+      actTitle.textContent = title;
+      actSub.textContent = sub;
+      actSub.style.display = sub ? '' : 'none';
+    }
+  }
+
+  function showActivity(data, duration){
+    var now = nowSec();
+    enterSeq++; totalEnter++;
+    act = {
+      data: data, type: data.type, start: now, until: now + duration,
+      duration: duration, n: enterSeq, expired: false, expT: 0
+    };                                   // compact.py:363-367：until/start 写进 dict
+    applyDom();
+    logLine('in', '入场 · ' + typeLabel(data) + ' · 停留 ' + duration.toFixed(1) + 's');
+  }
+
+  function updateActivity(patch, renew){
+    if (!act) return false;
+    var d = act.data;
+    for (var k in patch) if (Object.prototype.hasOwnProperty.call(patch, k)) d[k] = patch[k];
+    act.until = nowSec() + renew;        // app.py:247：until=now+1.8 续期
+    act.duration = renew;
+    act.expired = false;
+    applyDom();
+    return true;
+  }
+
+  /* ===== 目标尺寸（compact.py:407-427 size_hint）===== */
+  function targetSize(){
+    if (!act) return { w: IDLE_W, h: H_IDLE, note: 'idle 150×34' };
+    var d = act.data;
+    if (d.type === 'volume') return { w: 280, h: H_ACT, note: '280×40（volume/brightness 固定 · :414）' };
+    var tw = measure(F_TITLE, d.title || '');
+    var sw = measure(F_SUB, d.sub || '');
+    var raw = 70 + tw + sw + 24;
+    var w = clamp(raw, 220, 460);        // compact.py:416-417
+    return {
+      w: w, h: H_ACT,
+      note: 'clamp(70+' + Math.round(tw) + '+' + Math.round(sw) + '+24, 220, 460) = ' + Math.round(w) + ' ×40'
+    };
+  }
+
+  /* ===== 四类触发 ===== */
+  var msgIdx = 0;
+  btnMsg.addEventListener('click', function(){
+    var kind = KIND_ORDER[msgIdx % KIND_ORDER.length]; msgIdx++;
+    var k = KIND[kind];
+    btnMsg.textContent = '💬 消息 · ' + (kind === 'qq' ? 'QQ' : kind === 'wechat' ? '微信' : '邮件');
+    showActivity({ type:'message', kind:kind, glyph:k.glyph, color:k.color, title:k.title, sub:k.sub }, 4.0); // app.py:284-285：4.0s
+  });
+
+  function volumePatch(){
+    return {
+      type:'volume',
+      glyph: volMute.checked ? GLYPH.MUTE : GLYPH.VOLUME,   // app.py:245
+      value: Number(volSlider.value) / 100,
+      muted: volMute.checked
+    };
+  }
+  function volumePulse(fromSlider){
+    var patch = volumePatch();
+    var label = (patch.muted ? '静音' : Math.round(patch.value * 100) + '%');
+    if (act && act.type === 'volume' && !act.expired){
+      updateActivity(patch, 1.8);                          // app.py:246-247 原地续期
+      var t = performance.now();
+      if (!fromSlider || t - lastUpLog > 600){             // 拖动时节流防刷屏
+        lastUpLog = t;
+        logLine('up', '原地更新 · 音量 ' + label + ' · until+1.8s（未重播入场，入场计数不变）');
+      }
+    } else {
+      showActivity(patch, 1.8);                            // app.py:249 island.activity(act, 1.8)
+      lastUpLog = performance.now();
+    }
+  }
+  var lastUpLog = 0;
+  btnVol.addEventListener('click', function(){ volumePulse(false); });
+  volSlider.addEventListener('input', function(){ volumePulse(true); });
+  volMute.addEventListener('change', function(){ volumePulse(false); });
+
+  var TRS = [
+    '好的，已复制。',
+    '会议已改到周五下午，请提前十分钟入会。',
+    '在所有测试用例都通过之后，我们把构建产物打包发布；如果翻译结果特别长，提示会按内容长度自动延长停留时间，但读完之后它会自己消失，最长不会超过十二秒。'
+  ];
+  var trIdx = 0;
+  btnTr.addEventListener('click', function(){
+    var full = TRS[trIdx % TRS.length].replace(/\s+/g, ' ').trim(); trIdx++;
+    var len = Array.from(full).length;
+    var chars = Array.from(full);
+    var title = chars.length > 60 ? chars.slice(0, 60).join('') : full;   // app.py:57 first[:60] 只截展示
+    var raw = 3.5 + len * 0.12;                                           // 时长按全文长度算
+    var dur = Math.min(12.0, raw);                                        // app.py:57 min(12, 3.5+len*0.12)
+    showActivity({ type:'translate', glyph:GLYPH.TRANSLATE, title:title, sub:'' }, dur);
+    logEl.firstChild.textContent = logEl.firstChild.textContent +
+      '（3.5+' + len + '×0.12=' + raw.toFixed(2) + (raw > 12 ? '→封顶12' : '') + '）';
+  });
+
+  var STKS = [
+    { title:'宁德时代 300750', sub:'+3.24%', color:UP_COLOR,   dir:'涨' },
+    { title:'贵州茅台 600519', sub:'-1.85%', color:DOWN_COLOR, dir:'跌' }
+  ];
+  var stkIdx = 0;
+  btnStk.addEventListener('click', function(){
+    var s = STKS[stkIdx % STKS.length]; stkIdx++;
+    btnStk.textContent = '📈 股票提醒 · ' + s.dir;
+    // app.py:304-308：color=sub_color=涨跌色，5.0s
+    showActivity({ type:'stock', dir:s.dir, glyph:GLYPH.STOCK, color:s.color,
+                   title:s.title, sub:s.sub, sub_color:s.color }, 5.0);
+  });
+
+  /* ===== 渲染循环 ===== */
+  var pw = IDLE_W, ph = H_IDLE, pvw = 0, pvh = 0, lastT = nowSec();
+  var prev = { title:null, sub:null, val:null };
+  var idleText = '';
+
+  function frame(){
+    var now = nowSec();
+    var dt = Math.min(0.05, now - lastT); lastT = now;
+
+    /* 到期 → 淡出 → 交还原视图（mode() compact.py:387-399） */
+    if (act && !act.expired && now >= act.until) { act.expired = true; act.expT = now; }
+    if (act && act.expired && now - act.expT >= T_MODE) act = null;
+
+    var mode = act ? 'activity' : 'idle';
+    if (mode !== lastMode) { modeT = now; lastMode = mode; }
+    var fade = easeOut((now - modeT) / T_MODE);                 // compact.py:434
+    var actAlpha = act ? (act.expired ? 1 - fade : fade) : 0;
+    actLayer.style.opacity = actAlpha.toFixed(3);
+    idleLayer.style.opacity = (1 - actAlpha).toFixed(3);
+
+    /* 入场 0.35s ease_out（compact.py:664） */
+    var enter = act ? easeOut((now - act.start) / T_ENTER) : 0;
+    actIcon.style.opacity = enter.toFixed(3);
+    actIcon.style.transform = 'scale(' + (0.55 + 0.45 * enter).toFixed(3) + ')';
+    actText.style.opacity = enter.toFixed(3);
+    actText.style.transform = 'translateX(' + ((enter - 1) * 8).toFixed(2) + 'px)';
+
+    /* 尺寸弹簧逼近目标（size_hint compact.py:407-427） */
+    var ts = targetSize();
+    var k = 210, c = 26;                                        // 欠阻尼弹簧
+    pvw += (k * (ts.w - pw) - c * pvw) * dt; pw += pvw * dt;
+    pvh += (k * (ts.h - ph) - c * pvh) * dt; ph += pvh * dt;
+    pill.style.width = Math.max(60, pw).toFixed(1) + 'px';
+    pill.style.height = Math.max(24, ph).toFixed(1) + 'px';
+
+    /* 活动内容绘制（_paint_activity compact.py:660-719） */
+    if (act){
+      var d = act.data;
+      if (d.type === 'volume'){
+        var bw = volTrack.clientWidth;
+        var v = clamp(d.value, 0, 1);
+        volFill.style.width = Math.max(6, bw * v * enter) + 'px';   // compact.py:695
+        var vt = d.muted ? '静音' : String(Math.round(v * 100));
+        if (vt !== prev.val){ volVal.textContent = vt; prev.val = vt; }
+      } else {
+        var avail = Math.max(30, pw - 14 - 45);                      // compact.py:707 avail=r.right-14-x
+        var tw = measure(F_TITLE, d.title || '');
+        var sub = d.sub || '';
+        var subOn = sub && (tw + 10 < avail);                        // compact.py:712
+        var tTxt = elide(F_TITLE, d.title || '', avail);             // ElideRight
+        if (tTxt !== prev.title){ actTitle.textContent = tTxt; prev.title = tTxt; }
+        if (subOn){
+          var sw = avail - tw - 10;
+          var sTxt = elide(F_SUB, sub, sw);
+          if (sTxt !== prev.sub){ actSub.textContent = sTxt; prev.sub = sTxt; }
+          actSub.style.display = '';
+          actSub.style.color = d.sub_color || 'rgba(232,234,240,.66)';
+        } else {
+          actSub.style.display = 'none';
+        }
+        actTitle.style.color = d.title_color || '#e8eaf0';
+      }
+    } else {
+      prev.title = prev.sub = prev.val = null;
+    }
+
+    /* 常态时间（_paint_idle compact.py:548 起） */
+    var dd = new Date();
+    var t2 = String(dd.getHours()).padStart(2,'0') + ':' + String(dd.getMinutes()).padStart(2,'0');
+    if (t2 !== idleText){ idleText = t2; idleLayer.textContent = t2; }
+
+    /* 读数 */
+    sMode.textContent = mode;
+    sType.textContent = act ? typeLabel(act.data) : '—';
+    sSize.textContent = Math.round(pw) + '×' + Math.round(ph);
+    sLeft.textContent = act ? (act.expired ? '淡出中' : Math.max(0, act.until - now).toFixed(1) + 's') : '—';
+    sEnter.textContent = (act ? act.n : 0) + ' / ' + totalEnter;
+    sNote.textContent = ts.note;
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  /* 初始演示：1s 后弹一条消息，让页面一打开就有入场动画 */
+  setTimeout(function(){ btnMsg.click(); }, 900);
+})();
+</script>
+</body>
+</html>

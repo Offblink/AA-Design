@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🎤 歌词行切换与跑马灯 · AA-Design</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    min-height: 100vh;
+    padding: 36px 24px 64px;
+    line-height: 1.6;
+  }
+  header, #stage, .notes { max-width: 960px; margin-left: auto; margin-right: auto; }
+  header a {
+    display: inline-block;
+    color: rgba(232,234,240,0.55);
+    text-decoration: none;
+    font-size: 0.88rem;
+    padding: 6px 15px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: color .18s, border-color .18s;
+  }
+  header a:hover { color: #4f8cff; border-color: rgba(79,140,255,0.5); }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-top: 18px; }
+  .src { margin-top: 7px; font-size: 0.79rem; color: rgba(232,234,240,0.55); word-break: break-word; }
+
+  #stage {
+    margin-top: 24px;
+    min-height: 480px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    padding: 44px 20px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.07);
+    overflow: hidden;
+    position: relative;
+    background:
+      radial-gradient(560px 240px at 28% 34%, rgba(79,140,255,0.15), transparent 70%),
+      radial-gradient(520px 240px at 74% 62%, rgba(160,107,255,0.13), transparent 70%),
+      #0c0c14;
+  }
+  .pill-zone { position: relative; width: 100%; height: 120px; display: flex; align-items: center; justify-content: center; }
+  .glow {
+    position: absolute;
+    width: 480px; height: 110px;
+    border-radius: 999px;
+    background: radial-gradient(closest-side, rgba(79,140,255,0.38), rgba(160,107,255,0.16), transparent);
+    filter: blur(26px);
+    pointer-events: none;
+  }
+  #pill {
+    position: relative;
+    width: 796px;
+    height: 38px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    overflow: hidden;
+  }
+  #cv { position: absolute; left: 0; top: 0; display: block; }
+  .caption { font-size: 0.85rem; color: rgba(232,234,240,0.55); text-align: center; max-width: 640px; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+  button {
+    font: inherit;
+    font-size: 0.9rem;
+    color: #e8eaf0;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 9px 18px;
+    cursor: pointer;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: color .18s, border-color .18s, background .18s;
+  }
+  button:hover:not(:disabled) { color: #fff; border-color: rgba(79,140,255,0.6); background: rgba(79,140,255,0.14); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button.primary { border-color: rgba(79,140,255,0.5); color: #cfe0ff; }
+
+  .readout {
+    width: min(760px, 100%);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    padding: 14px 18px;
+    font-size: 0.78rem;
+    line-height: 1.8;
+    color: rgba(232,234,240,0.55);
+    white-space: pre-wrap;
+    overflow-x: auto;
+    font-variant-numeric: tabular-nums;
+    font-family: inherit;
+  }
+
+  .notes { margin-top: 38px; }
+  .notes h2 { font-size: 1rem; font-weight: 600; color: #4f8cff; margin: 26px 0 10px; }
+  .notes ul { list-style: none; }
+  .notes li {
+    position: relative;
+    padding-left: 17px;
+    margin: 8px 0;
+    font-size: 0.92rem;
+    color: rgba(232,234,240,0.88);
+  }
+  .notes li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0.62em;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #4f8cff;
+    opacity: 0.85;
+  }
+  .notes code {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.85em;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 6px;
+    padding: 1px 6px;
+    color: #7fb0ff;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>🎤 歌词行切换与跑马灯</h1>
+  <div class="src">wisland/ui/compact.py:571 _paint_media() ｜ :622-626 换行交叉过渡 ｜ :645-651 34px/s 跑马灯 ｜ :318-325 set_lyrics() 按最长句定宽 ｜ wisland/island.py:239 胶囊尺寸 Spring</div>
+</header>
+
+<div id="stage">
+  <div class="pill-zone">
+    <div class="glow"></div>
+    <div id="pill"><canvas id="cv"></canvas></div>
+  </div>
+  <div class="caption">hover 胶囊右侧播放键看圆底渐现 · 用按钮切句看 0.32s 交叉过渡 · 暂停后歌词行定住，但跑马灯继续滚（源码用绘制时刻 t 计时）</div>
+  <div class="controls">
+    <button id="btnPrev">⏮ 上一句</button>
+    <button id="btnPlay" class="primary">⏸ 暂停</button>
+    <button id="btnNext">⏭ 下一句</button>
+    <button id="btnLyric">🎵 歌词：开</button>
+  </div>
+  <pre class="readout" id="ro"></pre>
+</div>
+
+<section class="notes">
+  <h2>为什么值得借鉴</h2>
+  <ul>
+    <li><b>换行有方向感</b>：旧行上移 9px 淡出、新行从下方 9px 淡入（0.32s ease_out），"上一句过去了、这一句来了"一眼可读，不会原地闪切——源码注释原话：「换行：旧行上移淡出，新行从下方淡入」。</li>
+    <li><b>宽度一次定死</b>：胶囊宽度按整首最长一句 +160px 余量预先算好（640~760 封顶），句长参差也不引起外形抖动——「宽度按整首最长一句固定，不随每句变化」。</li>
+    <li><b>对齐跟着内容走</b>：歌词居中方便扫读，没歌词时歌名 · 歌手靠左与封面连成一条基线（注释：「歌词居中显示；歌名 · 歌手靠左」）。</li>
+    <li><b>跑马灯先停 2s 再滚</b>：先让人读到开头，再以 34px/s 匀速滚动——慢速不晕，双份绘制让循环处严丝合缝。</li>
+    <li><b>收起态直接可播控</b>：播放键固定在胶囊最右 28×28，hover 圆底 0.5 lerp 渐现，命中区还外扩 6/8px——不用展开就能暂停。</li>
+    <li><b>敢做减法</b>：两端渐隐需要独立图层、代价较高，源码直接「省略，靠裁剪即可」——把性能留给 60fps 动画。</li>
+  </ul>
+  <h2>实现要点</h2>
+  <ul>
+    <li>过渡：<code>k = ease_out((t − 本行出现时刻) / 0.32)</code>；旧行 y −9k、alpha 1−k；新行 y +9(1−k)、alpha k（compact.py:626-638）。</li>
+    <li>跑马灯：<code>gap = 40</code>、<code>period = (全文宽 + 40) / 34</code> 秒（34px/s），周期 <code>period + 2</code> 的前 2s 停住；双份绘制 <code>x = tx − off + j·(full+40)</code>，off 走满一轮 = full+gap 正好接回起点（:645-651）。</li>
+    <li>尺寸：<code>lyricW = clamp(最长句宽 + 160, 640, 760)</code>，胶囊 <code>W = max(300, lyricW) + 34</code>、高 36（compact.py:318-325 / :423 / :19）；外形跟随 <code>Spring(300, 0.62, 0.2)</code>（island.py:239）。</li>
+    <li>文本区：<code>tx = 封面右 + 10</code>（r.x()+44），<code>tw = (播放键左 − 6 − 律动条26) − 10 − tx</code>；无歌词时 idx 恒为 −1，直接走歌名 · 歌手分支（compact.py:574 / :601 / :614-615）。</li>
+    <li>律动条：4 根、宽 3.6、间距 7，<code>目标 = 0.18 + pk·(0.55 + 0.45·sin²(t·(7.3 + 2.1i) + 1.7i))</code>，每帧 <code>bar += (目标 − bar)·0.35</code> 追赶，高 <code>4 + 14·bar</code>；peak 先按 0.6/0.4 平滑（compact.py:605-608、paint :436）。</li>
+    <li>播放键：<code>rect = (r.right() − 36, cy − 14, 28, 28)</code>，hover 每帧 <code>+= (目标 − 当前)·0.5</code>，圆底 alpha 跟随；命中判定外扩 <code>(−6, −8, +6, +8)</code>（compact.py:587-599、island.py:1069 / :1116-1119）。</li>
+  </ul>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- 工具（移植 wisland/ui/anim.py ease_out / Spring） ----------
+  function clamp(x, lo, hi) { return x < lo ? lo : (x > hi ? hi : x); }
+  function easeOut(t) { t = clamp(t, 0, 1); return 1 - Math.pow(1 - t, 3); }
+
+  // Spring：anim.py:15-44，参数取 island.py:239 的胶囊尺寸弹簧 Spring(cw, 300, 0.62, 0.2)
+  function Spring(x, k, ratio, eps) {
+    this.x = x; this.v = 0; this.target = x;
+    this.k = k; this.c = 2 * ratio * Math.sqrt(k); this.eps = eps;
+  }
+  Spring.prototype.step = function (dt) {
+    if (Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8) {
+      this.x = this.target; this.v = 0; return;
+    }
+    var n = Math.max(1, Math.ceil(dt / (1 / 240)));
+    var h = dt / n;
+    for (var i = 0; i < n; i++) {
+      var a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h;
+      this.x += this.v * h;
+    }
+  };
+
+  // ---------- 歌词数据（按播放位置取行，等价 compact.py:337 lyric_now()） ----------
+  var TITLE = "青花瓷", ARTIST = "周杰伦";
+  var LONG = "天青色等烟雨而我在等你炊烟袅袅升起隔江千万里在瓶底书汉隶仿前朝的飘逸就当我为遇见你伏笔月色被打捞起晕开了结局";
+  var LINES = [
+    { t: "素胚勾勒出青花笔锋浓转淡", d: 3.0 },
+    { t: "瓶身描绘的牡丹一如你初妆", d: 3.2 },
+    { t: LONG, d: 18.0 },
+    { t: "冉冉檀香透过窗心事我了然", d: 3.0 },
+    { t: "釉色渲染仕女图韵味被私藏", d: 3.2 },
+    { t: "而你嫣然的一笑如含苞待放", d: 3.0 }
+  ];
+  var STARTS = [], TOTAL = 0;
+  for (var i = 0; i < LINES.length; i++) { STARTS.push(TOTAL); TOTAL += LINES[i].d; }
+
+  function idxAt(p) {
+    for (var j = 0; j < LINES.length; j++) { if (p < STARTS[j] + LINES[j].d) return j; }
+    return LINES.length - 1;
+  }
+
+  // ---------- 画布与状态 ----------
+  var CVW = 900, CVH = 36;                       // 画布按最大胶囊宽 794 + 弹簧过冲余量
+  var pill = document.getElementById("pill");
+  var cv = document.getElementById("cv");
+  var dpr = Math.max(1, window.devicePixelRatio || 1);
+  cv.width = Math.round(CVW * dpr);
+  cv.height = Math.round(CVH * dpr);
+  cv.style.width = CVW + "px";
+  cv.style.height = CVH + "px";
+  var ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  var FONT13 = '500 13px "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+  var FONT_NOTE = '13px "Segoe UI Symbol","Segoe Fluent Icons",system-ui,sans-serif';
+
+  ctx.font = FONT13;
+  function measure(s) { ctx.font = FONT13; return ctx.measureText(s).width; }
+
+  // set_lyrics()：宽度按整首最长一句固定（compact.py:318-325）
+  var widest = 0;
+  for (i = 0; i < LINES.length; i++) widest = Math.max(widest, measure(LINES[i].t));
+  var lyricW = clamp(widest + 160, 640, 760);   // clamp(widest + 160, W_TEXT=640, 760)
+  function targetW() { return Math.max(300, lyricEnabled ? lyricW : 0) + 34; }  // size_hint() :423
+
+  var lyricEnabled = true;
+  var pillW = new Spring(targetW(), 300, 0.62, 0.2);
+
+  var playing = true;
+  var pos = 0;
+  var peak = 0;
+  var bars = [0, 0, 0, 0];
+  var hov = 0, hv = 0;
+  var st = { lyrIdx: -2, lyrPrev: "", lyrCur: "", lyrT: 0, k: 1, el: 0, off: 0, full: 0, tw: 0, marquee: false, period: 0 };
+
+  // 封面（rounded_pixmap(…, 26, 7) 的 26×26、圆角 7，compact.py:574）
+  var coverGrad = ctx.createLinearGradient(8, 5, 34, 31);
+  coverGrad.addColorStop(0, "#4f8cff");
+  coverGrad.addColorStop(1, "#8a5cff");
+
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function elideRight(s, w) {
+    if (measure(s) <= w) return s;
+    var out = s;
+    while (out.length > 1 && measure(out + "…") > w) out = out.slice(0, -1);
+    return out + "…";                              // ElideRight（compact.py:636）
+  }
+
+  // ---------- 播放 / 切句 ----------
+  var btnPrev = document.getElementById("btnPrev");
+  var btnPlay = document.getElementById("btnPlay");
+  var btnNext = document.getElementById("btnNext");
+  var btnLyric = document.getElementById("btnLyric");
+
+  function togglePlay() {
+    playing = !playing;
+    btnPlay.textContent = playing ? "⏸ 暂停" : "▶ 播放";
+  }
+  function seek(idx) {
+    idx = (idx % LINES.length + LINES.length) % LINES.length;
+    pos = STARTS[idx];
+  }
+  btnPlay.addEventListener("click", togglePlay);
+  btnNext.addEventListener("click", function () { seek(idxAt(pos) + 1); });
+  btnPrev.addEventListener("click", function () { seek(idxAt(pos) - 1); });
+  btnLyric.addEventListener("click", function () {
+    lyricEnabled = !lyricEnabled;
+    // set_lyrics() 会把 _lyr_idx/_lyr_prev 复位为 -2/""：切换是瞬切，不走交叉过渡
+    st.lyrIdx = -2; st.lyrPrev = ""; st.lyrT = nowS();
+    pillW.target = targetW();
+    btnLyric.textContent = lyricEnabled ? "🎵 歌词：开" : "🎵 歌词：关（歌名·歌手）";
+    btnPrev.disabled = btnNext.disabled = !lyricEnabled;
+  });
+
+  // ---------- 播放键命中（island.py:1116-1119：rect 外扩 -6,-8,+6,+8） ----------
+  function hitPlay(lx, ly) {
+    var x = pillW.x - 36, y = 4;
+    return lx >= x - 6 && lx <= x + 28 + 6 && ly >= y - 8 && ly <= y + 28 + 8;
+  }
+  cv.addEventListener("mousemove", function (e) {
+    var r = cv.getBoundingClientRect();
+    hv = hitPlay(e.clientX - r.left, e.clientY - r.top) ? 1 : 0;
+    cv.style.cursor = hv ? "pointer" : "default";
+  });
+  cv.addEventListener("mouseleave", function () { hv = 0; cv.style.cursor = "default"; });
+  cv.addEventListener("click", function (e) {
+    var r = cv.getBoundingClientRect();
+    if (hitPlay(e.clientX - r.left, e.clientY - r.top)) togglePlay();
+  });
+
+  function nowS() { return performance.now() / 1000; }
+  function rawPeak(t) {
+    return clamp(0.52 + 0.34 * Math.sin(t * 2.9) + 0.22 * Math.sin(t * 6.3 + 1.7) + 0.12 * Math.sin(t * 11.1 + 0.4), 0, 1);
+  }
+
+  // ---------- 绘制（移植 compact.py:571 _paint_media） ----------
+  function paint(now) {
+    var W = pillW.x;
+    pill.style.width = Math.round(W + 2) + "px";   // border-box：+2 边框 → 内容区宽 W
+    ctx.clearRect(0, 0, CVW, CVH);
+
+    var cy = 18;
+    var tx = 44, bx = W - 68, tw = bx - 10 - tx;   // tx = 封面右+10（:614）；bx = 播放键左-6-26（:601/:615）
+
+    // --- 封面（:573-586） ---
+    rr(8, cy - 13, 26, 26, 7);
+    ctx.fillStyle = coverGrad;
+    ctx.fill();
+    ctx.font = FONT_NOTE;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText("♪", 21, cy + 0.5);
+    ctx.font = FONT13;
+
+    // --- 律动条（:600-613） ---
+    var pk = clamp(peak * 1.6, 0, 1);
+    ctx.fillStyle = "rgba(232,234,240,0.85)";
+    for (var bi = 0; bi < 4; bi++) {
+      var target = 0.18 + pk * (0.55 + 0.45 * Math.pow(Math.sin(now * (7.3 + bi * 2.1) + bi * 1.7), 2));
+      bars[bi] += (target - bars[bi]) * 0.35;
+      var bh = 4 + 14 * bars[bi];
+      rr(bx + bi * 7, cy - bh / 2, 3.6, bh, 1.8);
+      ctx.fill();
+    }
+
+    // --- 播放键（:587-599；hover lerp 0.5 来自 island.py:1069） ---
+    if (hov > 0.01) {
+      ctx.globalAlpha = hov;
+      ctx.fillStyle = "rgba(255,255,255,0.14)";
+      ctx.beginPath();
+      ctx.ellipse(W - 22, cy, 13, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = "#e8eaf0";
+    if (playing) {
+      rr(W - 26.4, cy - 5.5, 2.8, 11, 1.2); ctx.fill();
+      rr(W - 20.4, cy - 5.5, 2.8, 11, 1.2); ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(W - 25, cy - 6.2);
+      ctx.lineTo(W - 25, cy + 6.2);
+      ctx.lineTo(W - 14.5, cy);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // --- 文本状态机（:618-626：idx 变化 → 交叉过渡） ---
+    var idx = lyricEnabled ? idxAt(pos) : -1;
+    var isLyric = idx >= 0;
+    var text = isLyric ? LINES[idx].t : (TITLE + "  ·  " + ARTIST);
+    if (idx !== st.lyrIdx) {
+      st.lyrPrev = st.lyrIdx !== -2 ? st.lyrCur : "";
+      st.lyrIdx = idx;
+      st.lyrT = now;
+    }
+    st.lyrCur = text;
+    var k = easeOut((now - st.lyrT) / 0.32);
+    var full = measure(text);
+    st.k = k; st.full = full; st.tw = tw;
+    st.el = now - st.lyrT;
+
+    ctx.textBaseline = "middle";
+    ctx.save();
+    clipRegion(tx, 0, tw, CVH);                   // p.setClipRect(tx, y, tw, h)（:631）
+    if (k < 1 && st.lyrPrev) {
+      ctx.globalAlpha = 1 - k;
+      var pt = elideRight(st.lyrPrev, tw);
+      ctx.textAlign = isLyric ? "center" : "left";
+      ctx.fillStyle = "#e8eaf0";
+      ctx.fillText(pt, isLyric ? tx + tw / 2 : tx, cy - 9 * k);
+    }
+    var dy = st.lyrPrev ? 9 * (1 - k) : 0;        // :637
+    ctx.globalAlpha = st.lyrPrev ? k : 1;         // :638
+    ctx.fillStyle = "#e8eaf0";
+    if (full <= tw) {
+      st.marquee = false; st.off = 0;
+      ctx.textAlign = isLyric ? "center" : "left";
+      ctx.fillText(text, isLyric ? tx + tw / 2 : tx, cy + dy);
+    } else {
+      // 跑马灯（:645-651）：gap 40、34px/s、每行先停 2s、双份绘制
+      var gap = 40;
+      var period = (full + gap) / 34.0;
+      var el = now - st.lyrT;
+      var ph = el % (period + 2.0);
+      var off = ph < 2.0 ? 0 : (ph - 2.0) * 34.0;
+      st.marquee = true; st.off = off; st.period = period;
+      ctx.textAlign = "left";
+      for (var j = 0; j < 2; j++) {
+        ctx.fillText(text, tx - off + j * (full + gap), cy + dy);
+      }
+      // 两端渐隐按源码注释省略，靠裁剪（:652-657）
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  function clipRegion(x, y, w, h) {
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+  }
+
+  // ---------- 读数 ----------
+  var ro = document.getElementById("ro");
+  function updateReadout(now) {
+    var W = pillW.x;
+    var lines = [];
+    var mode = st.marquee
+      ? "跑马灯 34px/s · 停留 2s · 周期 " + st.period.toFixed(1) + "s · 循环 " + (((now - st.lyrT) % (st.period + 2)) / (st.period + 2) * 100).toFixed(0) + "%"
+      : (st.lyrIdx >= 0 ? "歌词居中显示" : "歌名 · 歌手靠左显示");
+    if (lyricEnabled) {
+      lines.push("胶囊 W " + W.toFixed(1) + " = max(300, clamp(" + widest.toFixed(0) + "+160, 640, 760)) + 34 ｜ 文本 " +
+        st.full.toFixed(0) + "px " + (st.full > st.tw ? ">" : "≤") + " 可用 " + st.tw.toFixed(0) + "px → " + mode);
+    } else {
+      lines.push("无歌词 → W = max(300, 0) + 34 = 334 ｜ 文本 " + st.full.toFixed(0) +
+        "px ≤ 可用 " + st.tw.toFixed(0) + "px → 歌名 · 歌手靠左显示");
+    }
+    if (lyricEnabled) {
+      var idx = idxAt(pos);
+      var rem = STARTS[idx] + LINES[idx].d - pos;
+      lines.push("第 " + (idx + 1) + "/" + LINES.length + " 句 · 本句剩 " + rem.toFixed(1) + "s · k = " +
+        st.k.toFixed(2) + " · off = " + st.off.toFixed(1) + "px");
+    } else {
+      lines.push("歌名 · 歌手模式（idx 恒为 −1）· k = " + st.k.toFixed(2));
+    }
+    lines.push((playing ? "播放中" : "已暂停（跑马灯仍继续）") + " · peak " + peak.toFixed(2) +
+      " · 律动条 h≈" + (4 + 14 * bars[0]).toFixed(1) + "px · 播放键 hover " + hov.toFixed(2));
+    ro.textContent = lines.join("\n");
+  }
+
+  // ---------- 主循环 ----------
+  var last = performance.now();
+  function frame(ts) {
+    var dt = Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    var now = nowS();
+
+    if (playing) { pos += dt; if (pos >= TOTAL) pos -= TOTAL; }
+    peak = peak * 0.6 + (playing ? rawPeak(now) : 0) * 0.4;  // compact.py:436 peak 平滑；暂停后归零
+    if (Math.abs(hov - hv) > 0.01) hov += (hv - hov) * 0.5; // island.py:1068-1069
+
+    pillW.step(dt);
+    paint(now);
+    updateReadout(now);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AA-Design · UI/UX 设计模式库</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a10; color:#e8eaf0;
+  font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+  min-height:100vh;
+}
+.header { padding:80px 24px 40px; text-align:center; }
+.header h1 {
+  font-size:clamp(2rem,5vw,3.5rem); font-weight:900; letter-spacing:-0.02em;
+  background:linear-gradient(135deg,#4f8cff,#7dd3fc,#c4b5fd);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.header p { color:rgba(232,234,240,0.55); margin-top:12px; font-size:1.05rem; line-height:1.7; }
+.header .meta { display:flex; gap:8px; justify-content:center; margin-top:18px; flex-wrap:wrap; }
+.header .meta span {
+  font-size:0.75rem; padding:4px 12px; border-radius:999px;
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  color:rgba(232,234,240,0.65); backdrop-filter:blur(18px);
+}
+.header .back {
+  display:inline-block; margin-top:20px; padding:8px 20px;
+  border:1px solid rgba(255,255,255,0.12); border-radius:999px;
+  color:rgba(232,234,240,0.55); font-size:0.85rem; text-decoration:none;
+  transition:all 0.2s; background:rgba(255,255,255,0.06);
+}
+.header .back:hover { border-color:#4f8cff; color:#4f8cff; }
+
+.categories { max-width:1200px; margin:0 auto; padding:24px 24px 80px; }
+.cat { margin-bottom:48px; }
+.cat h2 {
+  font-size:1.15rem; color:#4f8cff; margin-bottom:4px;
+  padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08);
+  display:flex; align-items:center; gap:8px;
+}
+.cat .desc { color:rgba(232,234,240,0.4); font-size:0.85rem; margin-bottom:20px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.card {
+  display:block; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px; padding:20px; text-decoration:none; color:rgba(232,234,240,0.8);
+  transition:all 0.25s; backdrop-filter:blur(18px);
+}
+.card:hover {
+  border-color:#4f8cff; transform:translateY(-2px);
+  box-shadow:0 4px 24px rgba(79,140,255,0.12); background:rgba(255,255,255,0.09);
+}
+.card h3 { font-size:1rem; color:#e8eaf0; margin-bottom:6px; font-weight:600; }
+.card p { font-size:0.8rem; color:rgba(232,234,240,0.5); line-height:1.6; margin-bottom:10px; }
+.card .tag {
+  display:inline-block; font-size:0.68rem; padding:2px 8px; border-radius:4px;
+  margin-right:6px; margin-bottom:4px; font-family:Consolas,monospace;
+}
+.t-shape { background:rgba(79,140,255,0.14); color:#7dd3fc; }
+.t-spring { background:rgba(196,181,253,0.14); color:#c4b5fd; }
+.t-glass { background:rgba(125,211,252,0.14); color:#7dd3fc; }
+.t-theme { background:rgba(251,191,36,0.14); color:#fbbf24; }
+.t-state { background:rgba(244,114,182,0.14); color:#f472b6; }
+.t-content { background:rgba(52,211,153,0.14); color:#34d399; }
+.t-perf { background:rgba(251,146,60,0.14); color:#fb923c; }
+.t-src { background:rgba(255,255,255,0.08); color:rgba(232,234,240,0.5); }
+
+.footer {
+  text-align:center; padding:40px 24px; color:rgba(232,234,240,0.3);
+  font-size:0.8rem; border-top:1px solid rgba(255,255,255,0.06);
+}
+.footer a { color:rgba(79,140,255,0.7); text-decoration:none; }
+.footer a:hover { color:#4f8cff; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>AA-Design</h1>
+  <p>从 wisland 毛玻璃灵动岛提炼的 UI/UX 设计模式 · 21 个可交互演示<br>每个组件附原仓库源码出处（文件:行号）</p>
+  <div class="meta">
+    <span>🫧 液态形态</span><span>⚡ 弹簧动效</span><span>🪟 毛玻璃</span><span>🖱️ 交互状态</span><span>📶 内容仲裁</span>
+  </div>
+  <a class="back" href="https://github.com/AsamiAkito/wisland" target="_blank">↗ 原仓库 AsamiAkito/wisland</a>
+</div>
+
+<div class="categories">
+
+  <!-- ═══════ 液态形态 ═══════ -->
+  <div class="cat">
+    <h2>🫧 液态形态</h2>
+    <div class="desc">把悬浮窗口当成液体：表面张力贴边、液桥拉丝、速度泪滴、按压凹陷 —— 统一的物质隐喻让所有交互共用一套视觉语言。</div>
+    <div class="grid">
+      <a class="card" href="components/liquid-edge-attachment.html">
+        <h3>🫧 液态贴边</h3>
+        <p>内凹表面张力圆角 + 拖动时沙漏形液桥，扯断留水滴缩回，靠近自动重连。</p>
+        <span class="tag t-shape">shape.py:161</span><span class="tag t-shape">BREAK=64</span><span class="tag t-src">可拖动</span>
+      </a>
+      <a class="card" href="components/velocity-teardrop.html">
+        <h3>💧 速度泪滴形变</h3>
+        <p>拖动按速度变泪滴：后缘拖尾收窄 38%、前缘鼓起，停止弹簧回正。</p>
+        <span class="tag t-shape">shape.py:108</span><span class="tag t-shape">deform()</span><span class="tag t-src">实时数值</span>
+      </a>
+      <a class="card" href="components/press-squash.html">
+        <h3>👆 按压挤压</h3>
+        <p>光标处高斯凹陷、体积守恒转移到别处，松手欠阻尼回弹外鼓。</p>
+        <span class="tag t-shape">island.py:1037</span><span class="tag t-spring">k=380/0.55</span><span class="tag t-src">可开关</span>
+      </a>
+      <a class="card" href="components/idle-breathing.html">
+        <h3>🌊 常态呼吸</h3>
+        <p>圆角呼吸 + 边缘流光 + 音乐律动波，收起态空闲 30fps 忙碌 60fps。</p>
+        <span class="tag t-shape">island.py _paint_rest</span><span class="tag t-perf">帧分级</span><span class="tag t-src">滑杆调峰值</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ═══════ 动效引擎 ═══════ -->
+  <div class="cat">
+    <h2>⚡ 动效引擎</h2>
+    <div class="desc">全项目零 cubic-bezier，所有运动都是阻尼弹簧；rest 检测定帧、240Hz 子步进保一致。</div>
+    <div class="grid">
+      <a class="card" href="components/spring-playground.html">
+        <h3>⚡ 阻尼弹簧调参台</h3>
+        <p>k/ratio/eps 实时调参 + x(t) 曲线，预设 wisland 各处真实参数。</p>
+        <span class="tag t-spring">anim.py:8</span><span class="tag t-spring">c=2·ratio·√k</span><span class="tag t-src">5 组预设</span>
+      </a>
+      <a class="card" href="components/frame-budget.html">
+        <h3>⏱️ 帧调度</h3>
+        <p>rest 停帧、30/60fps 分级、脏矩形可视化、16px 采样网格对齐。</p>
+        <span class="tag t-perf">island.py _tick</span><span class="tag t-perf">脏矩形</span><span class="tag t-src">fps 计数</span>
+      </a>
+      <a class="card" href="components/nav-spring-morph.html">
+        <h3>🧭 导航宽度弹簧展开</h3>
+        <p>选中项弹簧展开显示文字、裁剪区渐显、pill 底块随宽度流动。</p>
+        <span class="tag t-spring">nav.py:26</span><span class="tag t-state">k=260/0.56</span><span class="tag t-src">滚轮切换</span>
+      </a>
+      <a class="card" href="components/edge-snap.html">
+        <h3>🧲 吸附状态机</h3>
+        <p>加权选最近边、继承抛出速度冲压，冲过边缘转挤压形变再回弹。</p>
+        <span class="tag t-state">anchored→drag→snap</span><span class="tag t-spring">ratio=0.38</span><span class="tag t-src">可拖丢</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ═══════ 玻璃与主题 ═══════ -->
+  <div class="cat">
+    <h2>🪟 玻璃与主题</h2>
+    <div class="desc">毛玻璃不止一行 backdrop-filter：五层配方叠加 + 交叉淡入防闪；自动主题要有 EMA + 滞回 + 驻留。</div>
+    <div class="grid">
+      <a class="card" href="components/frosted-glass.html">
+        <h3>🪟 毛玻璃五层配方</h3>
+        <p>backdrop / tint / 光泽 / rim / 阴影逐层开关，背景切换 0.25s 交叉淡入。</p>
+        <span class="tag t-glass">island.py:967</span><span class="tag t-glass">_paint_glass</span><span class="tag t-src">逐层叠加</span>
+      </a>
+      <a class="card" href="components/auto-theme-hysteresis.html">
+        <h3>🌗 自动主题滞回</h3>
+        <p>EMA 平滑 + 双阈值 0.64/0.42 + 3 秒驻留，滚动网页也不会来回闪。</p>
+        <span class="tag t-theme">theme.py:139</span><span class="tag t-theme">feed_luminance</span><span class="tag t-src">可关滞回对比</span>
+      </a>
+      <a class="card" href="components/theme-palette.html">
+        <h3>🎨 四套色板分层</h3>
+        <p>dark / light / rouge / sky 同组元素切换，t2/t3 透明度按底色单独调。</p>
+        <span class="tag t-theme">PALETTES</span><span class="tag t-theme">pill_fg</span><span class="tag t-src">红涨绿跌</span>
+      </a>
+      <a class="card" href="components/cover-glow.html">
+        <h3>🎵 封面主色辉光</h3>
+        <p>缩到 1×1 取主色 → 提饱和 → 光晕；hover 放大 7% 上浮，进度条变粗。</p>
+        <span class="tag t-glass">home.py _set_cover</span><span class="tag t-glass">零成本取色</span><span class="tag t-src">hover 演示</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ═══════ 交互状态 ═══════ -->
+  <div class="cat">
+    <h2>🖱️ 交互状态</h2>
+    <div class="desc">悬停展开的延迟与锁、点击时序消歧、不抢焦点的轮询兜底 —— 常驻悬浮控件的交互铁律。</div>
+    <div class="grid">
+      <a class="card" href="components/hover-expand-lock.html">
+        <h3>🖱️ 悬停展开与锁</h3>
+        <p>220ms 进 / 450ms 出、locks 集合、单击 pin 600ms、双击长关、先长形状再填内容。</p>
+        <span class="tag t-state">island.py:1037</span><span class="tag t-state">locks</span><span class="tag t-src">状态机可视</span>
+      </a>
+      <a class="card" href="components/click-drag-timing.html">
+        <h3>👆 点击时序消歧</h3>
+        <p>单击 vs 双击定时器、4px 拖动阈值、长按 380ms 进拖动，事件日志逐条判定。</p>
+        <span class="tag t-state">doubleClickInterval</span><span class="tag t-state">4px</span><span class="tag t-src">事件日志</span>
+      </a>
+      <a class="card" href="components/focusless-popup.html">
+        <h3>🚪 不抢焦点弹层</h3>
+        <p>25ms 轮询 + armed 状态机关菜单；焦点被切走立即释放。关掉轮询就关不掉。</p>
+        <span class="tag t-state">system.py:44</span><span class="tag t-state">armed</span><span class="tag t-src">对照实验</span>
+      </a>
+      <a class="card" href="components/ios-controls.html">
+        <h3>🎛️ 控制中心控件</h3>
+        <p>粗滑块图标对比度翻转、磁贴弹簧变色、分段底块弹性滑动。</p>
+        <span class="tag t-state">widgets.py:247</span><span class="tag t-spring">press_scale</span><span class="tag t-src">三控件</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ═══════ 内容编排 ═══════ -->
+  <div class="cat">
+    <h2>📶 内容编排</h2>
+    <div class="desc">150×34 的胶囊要装五种内容：定仲裁优先级、定固定尺寸、定「谁来了谁先说」，比响应式布局更重要。</div>
+    <div class="grid">
+      <a class="card" href="components/compact-priority.html">
+        <h3>📶 收起态内容仲裁</h3>
+        <p>活动 &gt; 字幕 &gt; 音乐 &gt; 形象 严格优先级，尺寸弹簧跟随，固定宽度防抖。</p>
+        <span class="tag t-content">compact.py mode()</span><span class="tag t-content">优先级</span><span class="tag t-src">逐个触发</span>
+      </a>
+      <a class="card" href="components/activity-toast.html">
+        <h3>🔔 活动提示</h3>
+        <p>连续同类型原地更新不重入场；时长按内容长度（3.5 + len×0.12 秒）。</p>
+        <span class="tag t-content">update_activity</span><span class="tag t-content">续期不闪</span><span class="tag t-src">四类触发</span>
+      </a>
+      <a class="card" href="components/lyric-transition.html">
+        <h3>🎤 歌词切换与跑马灯</h3>
+        <p>换行旧行上移淡出、新行下方淡入；34px/s 无缝循环，律动条追峰值。</p>
+        <span class="tag t-content">compact.py _paint_media</span><span class="tag t-content">0.32s</span><span class="tag t-src">控制组</span>
+      </a>
+      <a class="card" href="components/subtitle-hierarchy.html">
+        <h3>🔤 字幕双行层级</h3>
+        <p>小字原文 + 大字译文双通道分主次，超长保留尾部，7s 安静让位。</p>
+        <span class="tag t-content">ElideLeft</span><span class="tag t-content">固定 60px</span><span class="tag t-src">逐句模拟</span>
+      </a>
+      <a class="card" href="components/pet-face.html">
+        <h3>👀 小形象状态机</h3>
+        <p>视线跟随、靠近随机表情（不重复）、眨眼、困倦、惊讶、按压挤歪。</p>
+        <span class="tag t-content">compact.py:26</span><span class="tag t-content">PetFace</span><span class="tag t-src">九宫格预览</span>
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  提取自 <a href="https://github.com/AsamiAkito/wisland" target="_blank">AsamiAkito/wisland</a>（MIT）· 设计模式与源码出处见 <a href="README.md">README.md</a> · 与 <a href="../Gasp-Design/index.html">Gasp-Design</a> 互补（动效技巧 vs 设计决策）
+</div>
+
+</body>
+</html>

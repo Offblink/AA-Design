@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🖱️ 悬停展开与锁 · AA-Design</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans", "MiSans", "Segoe UI Variable Text", "Microsoft YaHei UI", system-ui, sans-serif;
+    line-height: 1.6;
+    padding: 32px 24px 56px;
+  }
+  header { max-width: 960px; margin: 0 auto 18px; }
+  a.back {
+    display: inline-block;
+    color: rgba(232, 234, 240, 0.55);
+    text-decoration: none;
+    font-size: 0.88rem;
+    padding: 6px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: color .18s, border-color .18s;
+  }
+  a.back:hover { color: #e8eaf0; border-color: rgba(79, 140, 255, 0.55); }
+  h1 { font-size: 1.5rem; font-weight: 700; margin: 14px 0 6px; }
+  .src {
+    font-size: 0.78rem;
+    color: rgba(232, 234, 240, 0.55);
+    font-family: ui-monospace, Consolas, monospace;
+    word-break: break-all;
+  }
+
+  /* ================= 演示区 ================= */
+  #stage {
+    max-width: 960px;
+    height: 560px;
+    margin: 0 auto;
+    display: flex;
+    gap: 16px;
+  }
+  .screen {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background:
+      radial-gradient(620px 320px at 18% 112%, rgba(79, 140, 255, 0.28), transparent 62%),
+      radial-gradient(520px 280px at 88% -12%, rgba(176, 92, 255, 0.20), transparent 62%),
+      #101019;
+  }
+  .edge-line { position: absolute; top: 0; left: 0; right: 0; border-top: 2px dashed rgba(255, 255, 255, 0.22); }
+  .edge-label {
+    position: absolute; top: 5px; left: 12px;
+    font-size: 10px; letter-spacing: .1em;
+    color: rgba(232, 234, 240, 0.45);
+    z-index: 3;
+  }
+
+  /* 灵动岛 */
+  .island { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; }
+  .shape {
+    position: relative;
+    width: 140px; height: 38px;
+    border-radius: 19px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.38);
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .island.off .shape { opacity: 0.7; }
+  .face {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 13px; color: #e8eaf0;
+    pointer-events: none;
+  }
+  .face .dot { width: 7px; height: 7px; border-radius: 50%; background: #4f8cff; box-shadow: 0 0 8px #4f8cff; }
+  .face .tag-off { font-size: 10.5px; color: #ff8fa3; border: 1px solid rgba(255, 92, 122, .6); border-radius: 999px; padding: 0 7px; display: none; }
+  .island.off .face .tag-off { display: inline; }
+  .content {
+    position: absolute; top: 0; left: 0;
+    width: 328px; height: 176px;
+    padding: 12px;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .content.on { pointer-events: auto; }
+  .c-nav { display: flex; gap: 6px; margin-bottom: 10px; }
+  .c-tab { font-size: 11.5px; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); color: rgba(232, 234, 240, 0.7); }
+  .c-tab.on { background: #4f8cff; color: #fff; }
+  .c-row { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-bottom: 8px; color: rgba(232, 234, 240, 0.85); }
+  .c-row .nm { width: 32px; }
+  .c-bar { flex: 1; height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+  .c-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4f8cff, #86b4ff); }
+  .c-row b { font-size: 11px; font-weight: 500; color: rgba(232, 234, 240, 0.55); width: 34px; text-align: right; }
+  .c-tiles { display: flex; gap: 8px; margin-top: 2px; }
+  .c-tile { flex: 1; text-align: center; font-size: 11.5px; padding: 7px 0; border-radius: 12px; background: rgba(255, 255, 255, 0.07); color: rgba(232, 234, 240, 0.7); }
+  .c-tile.on { background: rgba(79, 140, 255, 0.85); color: #fff; }
+
+  /* 屏幕内状态角标 */
+  .chip {
+    position: absolute; bottom: 12px;
+    font-size: 11.5px;
+    padding: 5px 13px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    color: rgba(232, 234, 240, 0.82);
+    z-index: 3;
+    max-width: 66%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #status { left: 12px; }
+  #phase { right: 12px; font-family: ui-monospace, Consolas, monospace; font-size: 10.5px; color: rgba(232, 234, 240, 0.6); }
+
+  /* ================= 侧栏面板 ================= */
+  .panel { width: 302px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  .pblock {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 13px 15px;
+    flex-shrink: 0;
+  }
+  .pblock h3 { font-size: 0.85rem; font-weight: 600; color: #4f8cff; margin-bottom: 9px; letter-spacing: .04em; }
+
+  /* 状态机 */
+  .flow { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; }
+  .flow > *:not(.br) { grid-column: 1; justify-self: start; }
+  .node {
+    font-size: 12px; padding: 4px 12px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(232, 234, 240, 0.6);
+    transition: color .15s, border-color .15s, background .15s, box-shadow .15s;
+    white-space: nowrap;
+  }
+  .node.on {
+    background: rgba(79, 140, 255, 0.22);
+    border-color: #4f8cff;
+    color: #e8eaf0;
+    box-shadow: 0 0 12px rgba(79, 140, 255, 0.35);
+  }
+  .ed { height: 13px; margin-left: 15px; border-left: 2px solid rgba(255, 255, 255, 0.16); position: relative; }
+  .ed span { position: absolute; left: 8px; top: -4px; font-size: 10px; color: rgba(232, 234, 240, 0.45); white-space: nowrap; }
+  .ed.blocked { border-left-color: #ffb020; }
+  .ed.blocked span { color: #ffb020; }
+  .br {
+    grid-column: 2;
+    align-self: center;
+    font-size: 10.5px; padding: 4px 10px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    color: rgba(232, 234, 240, 0.55);
+    white-space: nowrap;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .br.on { border-style: solid; border-color: #4f8cff; color: #e8eaf0; background: rgba(79, 140, 255, 0.16); }
+  .br[data-n="pin"] { grid-row: 5; }
+  .br[data-n="never"] { grid-row: 9; }
+
+  /* 计时器 */
+  .trow { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5px; }
+  .trow .tl { color: rgba(232, 234, 240, 0.55); }
+  .trow .tv { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: #e8eaf0; }
+  .tbar { height: 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); margin: 4px 0 9px; overflow: hidden; }
+  .tbar i { display: block; height: 100%; width: 0; background: #4f8cff; border-radius: 999px; }
+  .srow { display: flex; justify-content: space-between; font-size: 11.5px; padding-top: 2px; }
+  .srow .sv { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: rgba(232, 234, 240, 0.85); }
+
+  /* 锁 dock（放在屏幕内的空白区） */
+  .dock {
+    position: absolute; bottom: 46px; left: 50%; transform: translateX(-50%);
+    z-index: 3; text-align: center; max-width: 94%;
+  }
+  .dock .hint {
+    font-size: 10.5px; color: rgba(232, 234, 240, 0.5);
+    line-height: 1.5; margin-bottom: 8px;
+  }
+  .chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .lock {
+    font-size: 12px; padding: 5px 15px; border-radius: 999px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(232, 234, 240, 0.65);
+    cursor: pointer;
+    font-family: ui-monospace, Consolas, monospace;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: color .15s, border-color .15s, background .15s, box-shadow .15s;
+  }
+  .lock:hover { border-color: rgba(79, 140, 255, 0.6); }
+  .lock.on { background: rgba(79, 140, 255, 0.3); border-color: #4f8cff; color: #fff; box-shadow: 0 0 10px rgba(79, 140, 255, 0.3); }
+  .reset {
+    font-size: 11.5px; padding: 5px 14px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(232, 234, 240, 0.75);
+    cursor: pointer;
+    font-family: inherit;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: border-color .15s;
+  }
+  .reset:hover { border-color: rgba(79, 140, 255, 0.6); }
+
+  /* ================= 说明 ================= */
+  .notes { max-width: 960px; margin: 26px auto 0; display: flex; gap: 22px; align-items: flex-start; }
+  .note-col {
+    flex: 1; min-width: 0;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 20px 24px;
+  }
+  .notes h2 { font-size: 1rem; font-weight: 600; color: #4f8cff; margin-bottom: 12px; }
+  .notes li { font-size: 13.5px; color: rgba(232, 234, 240, 0.82); margin: 0 0 10px 18px; line-height: 1.65; }
+  .notes code {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 1px 5px;
+    border-radius: 5px;
+    color: #9fc3ff;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="../index.html">← 画廊</a>
+  <h1>🖱️ 悬停展开与锁</h1>
+  <p class="src">wisland/ui/island.py:1037 _poll_hover() · :1132 _single_click() · :1147 toggle_long_off() · :577 _tick() 内容显示判据 · :168 _BlankDoubleClick()</p>
+</header>
+
+<div id="stage">
+  <!-- 演示：贴顶边的灵动岛 -->
+  <div class="screen" id="screen">
+    <div class="edge-line"></div>
+    <div class="edge-label">屏幕顶边</div>
+
+    <div class="island" id="island">
+      <div class="shape" id="shape">
+        <div class="face" id="face">
+          <span class="dot"></span>
+          <span id="clock">12:00</span>
+          <span class="tag-off">长关</span>
+        </div>
+        <div class="content" id="content">
+          <div class="c-nav">
+            <span class="c-tab on">控制</span><span class="c-tab">主页</span><span class="c-tab">消息</span><span class="c-tab">翻译</span>
+          </div>
+          <div class="c-row"><span class="nm">音量</span><div class="c-bar"><i style="width:68%"></i></div><b>68%</b></div>
+          <div class="c-row"><span class="nm">亮度</span><div class="c-bar"><i style="width:42%"></i></div><b>42%</b></div>
+          <div class="c-tiles">
+            <span class="c-tile on">WLAN</span><span class="c-tile">蓝牙</span><span class="c-tile on">勿扰</span><span class="c-tile">夜间</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dock">
+      <p class="hint">单击胶囊 → 自动加 pin 锁 600ms；手动点亮的锁不会自动过期（收起 / 长关时 wisland 会 discard pin、release_focus，island.py:401/404）</p>
+      <div class="chips">
+        <button class="lock" id="lk-pin" type="button">pin</button>
+        <button class="lock" id="lk-focus" type="button">focus</button>
+        <button class="lock" id="lk-menu" type="button">menu</button>
+        <button class="lock" id="lk-lookup" type="button">lookup</button>
+        <button class="reset" id="reset" type="button">⟲ 重置</button>
+      </div>
+    </div>
+
+    <div class="chip" id="status">—</div>
+    <div class="chip" id="phase">收起胶囊 140×38</div>
+  </div>
+
+  <!-- 侧栏：状态机 / 计时器 / 锁 -->
+  <aside class="panel">
+    <div class="pblock">
+      <h3>实时状态机</h3>
+      <div class="flow">
+        <span class="node" data-n="idle">收起</span>
+        <div class="ed"><span>指针进入</span></div>
+        <span class="node" data-n="hover">悬停计时 220ms</span>
+        <div class="ed"><span>到时</span></div>
+        <span class="node" data-n="exp">展开 · 形状先长</span>
+        <span class="br" data-n="pin" title="_single_click：expand + locks.add(pin) + singleShot(600ms) 自动释放">单击 → pin 锁 600ms</span>
+        <div class="ed" id="e-out"><span id="e-out-label">移开且 locks 空</span></div>
+        <span class="node" data-n="out">离场计时 450ms</span>
+        <div class="ed"><span>到时</span></div>
+        <span class="node" data-n="idle2">收起</span>
+        <span class="br" data-n="never" title="toggle_long_off：新 never 且已展开 → 丢 pin、release_focus、立即 collapse，不等鼠标移出、不弹提示">双击 → 长关 never</span>
+      </div>
+    </div>
+
+    <div class="pblock">
+      <h3>计时器读数</h3>
+      <div class="trow"><span class="tl">悬停展开 hover_expand_ms</span><span class="tv" id="v-hover">—</span></div>
+      <div class="tbar"><i id="b-hover"></i></div>
+      <div class="trow"><span class="tl">离场收起 collapse_delay_ms</span><span class="tv" id="v-out">—</span></div>
+      <div class="tbar"><i id="b-out"></i></div>
+      <div class="trow"><span class="tl">单击判定 doubleClickInterval</span><span class="tv" id="v-click">—</span></div>
+      <div class="tbar"><i id="b-click"></i></div>
+      <div class="trow"><span class="tl">pin 锁 _single_click 600ms</span><span class="tv" id="v-pin">—</span></div>
+      <div class="tbar"><i id="b-pin"></i></div>
+      <div class="srow"><span>展开方式 expand_mode</span><span class="sv" id="s-mode">hover</span></div>
+    </div>
+
+  </aside>
+</div>
+
+<section class="notes">
+  <div class="note-col">
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li>展开与收起是两段<b>不等长</b>的去抖：碰到后停 220ms 才展开、移开后等 450ms 才收起（<code>island.py:1084</code> hover_expand_ms、<code>:1096</code> collapse_delay_ms）。路过不误开，短暂移出也不闪收。</li>
+      <li>收起只看 <code>locks</code> 集合是否为空（<code>island.py:1091</code> <code>if self.locks or self.pinned()</code>）：菜单、查词、输入框任一在位就清零离场计时，用户正在操作的浮层不会被「鼠标移开」打断。</li>
+      <li>单击是明确意图：展开的同时加 pin 锁并 600ms 后自动释放（<code>island.py:1135-1136</code>），给点击后的阅读留出确定窗口，再交还给悬停逻辑——点完不会立刻被收走。</li>
+      <li>双击在收起态与展开态都能切「长关」（<code>island.py:1147</code> toggle_long_off、<code>:168</code> _BlankDoubleClick 展开后双击空白区）；长关时立即收起、不等鼠标移出、不弹任何提示（<code>:1151-1155</code> 注释）。</li>
+      <li>形状先长到完整尺寸、内容才显示（<code>island.py:576-577</code> 注释与判据），收起时内容立即隐藏、玻璃形状再收回胶囊（<code>:399</code> 注释）——形变全程不出现「有内容、没有玻璃底」的穿帮帧（<code>:456-457</code> 注释）。</li>
+      <li>悬停展开前检查鼠标左键没按住（<code>island.py:1084-1085</code> GetAsyncKeyState(0x01)）：按住拖窗口扫过灵动岛时不会误弹。</li>
+    </ul>
+  </div>
+  <div class="note-col">
+    <h2>实现要点</h2>
+    <ul>
+      <li>阈值原样搬：悬停 220ms、离场 450ms、单击 pin 600ms、单击判定窗口用 Qt 的 doubleClickInterval（默认 400ms，<code>island.py:1129</code>）；wisland 的 _poll_hover 跑在 25ms 定时器上（<code>island.py:304</code>），本页同样每 25ms 轮询一次，渲染走 rAF。</li>
+      <li>弹簧逐参数移植（<code>anim.py:8-46</code>）：阻尼系数 <code>c = 2·ratio·√k</code>（<code>anim.py:16</code>），rest 判定 <code>|x−target|&lt;eps 且 |v|&lt;8·eps</code>（<code>anim.py:45-46</code>），半隐式欧拉子步 ≤1/240s；形状展开 <code>to(w, 420, 0.62)</code>（<code>island.py:383-384</code>）、收回 <code>to(cw, 460, 0.64)</code>（<code>:570-571</code>）、初始 <code>Spring(cw, 300, 0.62, 0.2)</code>（<code>:239-240</code>），dt 钳制 1/240~1/30（<code>:556</code>）。</li>
+      <li>内容显示判据逐帧检查 <code>sh.x≥h−1 &amp;&amp; sw.x≥w−1 &amp;&amp; content_a.target&lt;1</code>（<code>island.py:577</code>），满足才 <code>content_a.to(1, 700, 1.0)</code> + <code>content.show()</code>（<code>:579/:582</code>）；expand() 先把内容几何设成最终尺寸并隐藏（<code>:385-387</code>「先隐藏，形状长大后再显示」），页面数据刷新再延迟 40ms（<code>:440-442</code> _defer_show）让形变先跑。</li>
+      <li>收起顺序固定：<code>content_a.snap(0)</code> → <code>content.hide()</code> → <code>release_focus()</code> → <code>locks.discard("pin")</code>（<code>island.py:398-404</code>），形状随后由 <code>:570-571</code> 的弹簧收回；收放态小脸用 compact_a 淡出 <code>to(0, 900, 1.0)</code>、淡入 <code>to(1, 420, 1.0)</code>（<code>:380/:573</code>）。</li>
+      <li>locks 四个来源：pin ← _single_click 600ms（<code>:1135-1136</code>）、focus ← request_focus（<code>:1256</code>）且前台窗口切走立即释放（<code>:1039-1041</code>）、menu ← 右键菜单弹出 / aboutToHide 释放（<code>pages/system.py:201-202</code>）、lookup ← 查词浮层 show / hide（<code>lookup.py:101/106</code>）。</li>
+      <li>双击两条路径：收起态由 mouseDoubleClickEvent 先停掉单击定时器再 toggle_long_off（<code>island.py:1142-1145</code>），展开态空白区由 _BlankDoubleClick 事件过滤器拦截（<code>:168-184</code>）——保证第二次点击不会先触发单击展开。</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+'use strict';
+
+/* ============================================================
+   Spring：移植自 wisland/ui/anim.py:8-46
+   c = 2·ratio·√k；rest: |x−target|<eps 且 |v|<8·eps；子步 ≤1/240s
+   ============================================================ */
+class Spring {
+  constructor(value = 0, k = 300, ratio = 0.8, eps = 0.05) {
+    this.x = value;
+    this.v = 0;
+    this.target = value;
+    this.k = k;
+    this.c = 2 * ratio * Math.sqrt(k);
+    this.eps = eps;
+  }
+  to(target, k, ratio) {
+    this.target = target;
+    if (k != null) { this.k = k; this.c = 2 * ratio * Math.sqrt(k); }
+  }
+  snap(value) { this.x = this.target = value; this.v = 0; }
+  get rest() {
+    return Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8;
+  }
+  step(dt) {
+    if (this.rest) { this.x = this.target; this.v = 0; return; }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240)));
+    const h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h;
+      this.x += this.v * h;
+    }
+  }
+}
+
+/* ---------- 阈值（与 wisland 一致） ---------- */
+const HOVER_MS = 220;    // island.py:1084 island.hover_expand_ms
+const OUT_MS   = 450;    // island.py:1096 island.collapse_delay_ms
+const PIN_MS   = 600;    // island.py:1136 QTimer.singleShot(600, ...)
+const DBL_MS   = 400;    // island.py:1129 QApplication.doubleClickInterval()（Qt 默认 400ms）
+const POLL_MS  = 25;     // island.py:304 QTimer(interval=25, timeout=_poll_hover)
+
+/* ---------- 尺寸 ---------- */
+const CP_W = 140, CP_H = 38;      // 收起胶囊
+const EXP_W = 328, EXP_H = 176;   // 展开面板
+const EXP_R = 24;                 // 展开圆角
+
+const $ = id => document.getElementById(id);
+const shape = $('shape'), content = $('content'), face = $('face'),
+      island = $('island'), statusEl = $('status'), phaseEl = $('phase');
+
+const st = {
+  expanded: false,
+  mode: 'hover',            // hover | never（长关）
+  locks: new Set(),         // pin / focus / menu / lookup
+  hoverSince: null,
+  outSince: null,
+  clickDue: 0,              // 单击判定截止时间戳
+  pinDue: 0,                // 自动 pin 释放时间戳
+  cursor: { x: 0, y: 0 },
+  cursorLive: false,
+  pointerDown: false,       // GetAsyncKeyState(0x01) 的对应物
+  pressOn: false,
+  inside: false
+};
+
+const sw = new Spring(CP_W, 300, 0.62, 0.2);   // island.py:239
+const sh = new Spring(CP_H, 300, 0.62, 0.2);   // island.py:240
+const contentA = new Spring(0, 700, 1.0, 0.05);
+const faceA = new Spring(1, 420, 1.0, 0.01);
+
+const clamp = (x, lo, hi) => (x < lo ? lo : x > hi ? hi : x);
+
+function setContentVisible(on) {
+  content.style.visibility = on ? 'visible' : 'hidden';
+  content.classList.toggle('on', on);
+}
+
+/* ---------- 状态机动作 ---------- */
+function expand() {                       // island.py:370-392
+  if (st.expanded) return;
+  st.expanded = true;
+  faceA.to(0, 900, 1.0);                          // :380 compact_a.to(0, 900, 1.0)
+  sw.to(EXP_W, 420, 0.62);                        // :383
+  sh.to(EXP_H, 420, 0.62);                        // :384
+  contentA.snap(0);                               // :385
+  setContentVisible(false);                       // :387 先隐藏，形状长大后再显示
+}
+
+function collapse() {                      // island.py:394-409
+  if (!st.expanded) return;
+  st.expanded = false;
+  contentA.snap(0);                               // :398
+  setContentVisible(false);                       // :399 立即隐藏内容，玻璃形状再收回胶囊
+  st.locks.delete('focus');                       // :401 release_focus()
+  st.locks.delete('pin');                         // :404 locks.discard("pin")
+  st.pinDue = 0;
+  sw.to(CP_W, 460, 0.64);                         // :570
+  sh.to(CP_H, 460, 0.64);                         // :571
+  faceA.to(1, 420, 1.0);                          // :573 compact_a.to(1, 420, 1.0)
+}
+
+function singleClick() {                   // island.py:1132-1136 _single_click()
+  if (st.expanded || st.mode === 'never') return;
+  expand();
+  if (!st.locks.has('pin')) {
+    st.locks.add('pin');
+    st.pinDue = performance.now() + PIN_MS;       // singleShot(600, discard)
+  }
+}
+
+function toggleLongOff() {                 // island.py:1147-1155
+  st.mode = st.mode === 'never' ? 'hover' : 'never';
+  if (st.mode === 'never') {
+    st.locks.delete('pin');                       // :1153 / :1216
+    st.pinDue = 0;
+    if (st.expanded) collapse();                  // :1151-1155 立即收起，不等鼠标移出
+  }
+}
+
+/* ---------- 25ms 轮询（island.py:1037 _poll_hover） ---------- */
+function poll(now) {
+  let inside = false;
+  if (st.cursorLive) {
+    const r = shape.getBoundingClientRect();
+    inside = st.cursor.x >= r.left && st.cursor.x <= r.right &&
+             st.cursor.y >= r.top && st.cursor.y <= r.bottom;
+  }
+  st.inside = inside;
+  if (inside) {
+    st.outSince = null;
+    if (!st.expanded && st.mode !== 'never') {
+      if (st.hoverSince == null) {
+        st.hoverSince = now;
+      } else if (now - st.hoverSince >= HOVER_MS && !st.pointerDown) {
+        st.hoverSince = null;                     // island.py:1084-1087（含左键未按住）
+        expand();
+      }
+    }
+  } else {
+    st.hoverSince = null;
+    if (st.expanded) {
+      if (st.locks.size > 0) {                    // island.py:1091-1093 锁在位 → 清零离场计时
+        st.outSince = null;
+      } else {
+        if (st.outSince == null) st.outSince = now;
+        else if (now - st.outSince >= OUT_MS) {   // island.py:1096-1098
+          st.outSince = null;
+          collapse();
+        }
+      }
+    }
+  }
+}
+
+/* ---------- 渲染辅助 ---------- */
+const nodeMap = {};
+document.querySelectorAll('[data-n]').forEach(n => {
+  (nodeMap[n.dataset.n] = nodeMap[n.dataset.n] || []).push(n);
+});
+function setN(k, on) { (nodeMap[k] || []).forEach(n => n.classList.toggle('on', on)); }
+
+function bar(id, frac) { $(id).style.width = (clamp(frac, 0, 1) * 100).toFixed(1) + '%'; }
+
+function statusText(t) {
+  if (st.mode === 'never') return '长关 never：悬停 / 单击无效 · 双击恢复';
+  if (st.expanded) {
+    if (st.locks.size > 0) return '锁在位 ' + [...st.locks].join('/') + ' → 不收起';
+    if (st.outSince != null) return '离场 ' + Math.round(Math.min(OUT_MS, t - st.outSince)) + ' / 450 ms';
+    return st.inside ? '展开中 · 指针在岛上' : '展开中 · 等待指针移出';
+  }
+  if (st.clickDue) return '单击判定 ' + Math.round(Math.max(0, st.clickDue - t)) + ' / 400 ms';
+  if (st.hoverSince != null) return '悬停 ' + Math.round(Math.min(HOVER_MS, t - st.hoverSince)) + ' / 220 ms';
+  if (st.pointerDown) return '按住左键 · 悬停不展开';
+  return '悬停 220ms 展开 · 移开 450ms 收起 · 单击 pin 600ms · 双击长关';
+}
+
+function phaseText() {
+  if (st.mode === 'never') return st.expanded ? '长关 · 展开中' : '长关 · 收起';
+  if (st.expanded) {
+    const full = sh.x >= EXP_H - 1 && sw.x >= EXP_W - 1;
+    return full
+      ? '内容已显示 · 形状 ' + (sw.x | 0) + '×' + (sh.x | 0)
+      : '形状生长中 ' + (sw.x | 0) + '×' + (sh.x | 0) + ' → 328×176 · 内容隐藏';
+  }
+  const shrinking = Math.abs(sw.x - CP_W) > 0.5 || Math.abs(sh.x - CP_H) > 0.5;
+  return shrinking ? '内容立即隐藏 · 形状收回胶囊' : '收起胶囊 140×38';
+}
+
+function render(t) {
+  /* 锁 chips */
+  for (const k of ['pin', 'focus', 'menu', 'lookup']) {
+    $('lk-' + k).classList.toggle('on', st.locks.has(k));
+  }
+
+  /* 状态机节点 */
+  const idle = !st.expanded && st.hoverSince == null && st.mode !== 'never';
+  setN('idle', idle);
+  setN('idle2', idle);
+  setN('hover', st.hoverSince != null);
+  setN('exp', st.expanded);
+  setN('out', st.outSince != null);
+  setN('pin', st.locks.has('pin'));
+  setN('never', st.mode === 'never');
+
+  /* 离场边：锁在位时变琥珀色 */
+  const blocked = st.expanded && st.locks.size > 0 && !st.inside;
+  $('e-out').classList.toggle('blocked', blocked);
+  $('e-out-label').textContent = blocked ? '锁在位 · 收起被阻塞' : '移开且 locks 空';
+
+  /* 计时器读数 */
+  $('v-hover').textContent = st.hoverSince != null
+    ? Math.round(Math.min(HOVER_MS, t - st.hoverSince)) + ' / 220 ms' : '—';
+  bar('b-hover', st.hoverSince != null ? (t - st.hoverSince) / HOVER_MS : 0);
+
+  $('v-out').textContent = st.outSince != null
+    ? Math.round(Math.min(OUT_MS, t - st.outSince)) + ' / 450 ms' : '—';
+  bar('b-out', st.outSince != null ? (t - st.outSince) / OUT_MS : 0);
+
+  $('v-click').textContent = st.clickDue
+    ? Math.round(Math.max(0, st.clickDue - t)) + ' / 400 ms' : '—';
+  bar('b-click', st.clickDue ? 1 - (st.clickDue - t) / DBL_MS : 0);
+
+  $('v-pin').textContent = st.pinDue
+    ? '剩 ' + Math.round(Math.max(0, st.pinDue - t)) + ' ms'
+    : (st.locks.has('pin') ? '手动常驻' : '—');
+  bar('b-pin', st.pinDue ? 1 - (st.pinDue - t) / PIN_MS : (st.locks.has('pin') ? 1 : 0));
+
+  $('s-mode').textContent = st.mode;
+
+  /* 角标 */
+  statusEl.textContent = statusText(t);
+  phaseEl.textContent = phaseText();
+  island.classList.toggle('off', st.mode === 'never');
+}
+
+/* ---------- 主循环 ---------- */
+let last = performance.now();
+let lastPoll = performance.now();
+
+function frame(t) {
+  const dt = Math.min(1 / 30, Math.max(1 / 240, (t - last) / 1000));  // island.py:556
+  last = t;
+
+  if (t - lastPoll >= POLL_MS) { lastPoll = t; poll(t); }             // 25ms 轮询
+  if (st.clickDue && t >= st.clickDue) { st.clickDue = 0; singleClick(); }
+  if (st.pinDue && t >= st.pinDue) { st.pinDue = 0; st.locks.delete('pin'); }
+
+  /* 内容显示判据（island.py:577-582：先判后步，与 _tick 顺序一致） */
+  if (st.expanded && sh.x >= EXP_H - 1 && sw.x >= EXP_W - 1 && contentA.target < 1) {
+    contentA.snap(0);
+    contentA.to(1, 700, 1.0);
+    setContentVisible(true);
+  }
+
+  sw.step(dt); sh.step(dt); contentA.step(dt); faceA.step(dt);
+
+  /* 应用形状 */
+  const w = sw.x, h = sh.x;
+  shape.style.width = w.toFixed(2) + 'px';
+  shape.style.height = h.toFixed(2) + 'px';
+  const tt = clamp((h - CP_H) / (EXP_H - CP_H), 0, 1);
+  shape.style.borderRadius = (CP_H / 2 + (EXP_R - CP_H / 2) * tt).toFixed(2) + 'px';
+  content.style.opacity = contentA.x.toFixed(3);
+  face.style.opacity = faceA.x.toFixed(3);
+
+  render(t);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- 输入事件 ---------- */
+document.addEventListener('pointermove', e => {
+  st.cursor.x = e.clientX;
+  st.cursor.y = e.clientY;
+  st.cursorLive = true;
+});
+document.addEventListener('pointerout', e => {
+  if (!e.relatedTarget) { st.cursorLive = false; st.pointerDown = false; }
+});
+document.addEventListener('pointerdown', e => { if (e.button === 0) st.pointerDown = true; });
+document.addEventListener('pointerup', e => {
+  if (e.button !== 0) return;
+  st.pointerDown = false;
+  if (st.pressOn) {
+    st.pressOn = false;
+    if (!st.expanded && st.mode !== 'never') {
+      st.clickDue = performance.now() + DBL_MS;   // island.py:1129 doubleClickInterval
+    }
+  }
+});
+document.addEventListener('pointercancel', () => { st.pointerDown = false; st.pressOn = false; });
+
+shape.addEventListener('pointerdown', e => { if (e.button === 0) st.pressOn = true; });
+shape.addEventListener('dblclick', e => {
+  e.preventDefault();
+  st.clickDue = 0;                                // island.py:1143 停掉单击定时器
+  toggleLongOff();                                // :1144 / :168 _BlankDoubleClick
+});
+
+/* ---------- 锁 chips / 重置 ---------- */
+for (const k of ['pin', 'focus', 'menu', 'lookup']) {
+  $('lk-' + k).addEventListener('click', () => {
+    if (st.locks.has(k)) {
+      st.locks.delete(k);
+      if (k === 'pin') st.pinDue = 0;
+    } else {
+      st.locks.add(k);
+      if (k === 'pin') st.pinDue = 0;            // 手动 pin = 常驻，不走 600ms 自动释放
+    }
+  });
+}
+$('reset').addEventListener('click', () => {
+  st.locks.clear();
+  st.pinDue = 0; st.clickDue = 0;
+  st.hoverSince = null; st.outSince = null;
+  st.mode = 'hover';
+  st.pressOn = false;
+  if (st.expanded) collapse();
+});
+
+/* ---------- 时钟 ---------- */
+function tickClock() {
+  const d = new Date();
+  $('clock').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

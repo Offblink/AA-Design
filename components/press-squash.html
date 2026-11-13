@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>👆 按压挤压 · AA-Design</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans", "MiSans", "Segoe UI Variable Text", "Microsoft YaHei UI", system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 32px 20px 56px;
+  }
+  header, #stage, .notes { max-width: 780px; margin-left: auto; margin-right: auto; }
+  header { margin-bottom: 18px; }
+  .back { color: #4f8cff; text-decoration: none; font-size: 0.9rem; }
+  .back:hover { text-decoration: underline; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-top: 10px; }
+  .src { margin-top: 6px; color: rgba(232, 234, 240, 0.55); font-size: 0.78rem; line-height: 1.7; }
+  .src code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 0.95em; color: #9fc1ff; }
+
+  #stage {
+    position: relative;
+    height: 480px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  .hud {
+    position: absolute; top: 14px; left: 14px;
+    background: rgba(10, 10, 16, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    line-height: 1.9;
+    color: rgba(232, 234, 240, 0.55);
+    pointer-events: none;
+    min-width: 168px;
+  }
+  .hud b { color: #e8eaf0; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hud .row { display: flex; justify-content: space-between; gap: 14px; }
+
+  .controls {
+    position: absolute; right: 14px; bottom: 14px;
+    background: rgba(10, 10, 16, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: rgba(232, 234, 240, 0.55);
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; user-select: none;
+  }
+  .controls input { accent-color: #4f8cff; width: 15px; height: 15px; cursor: pointer; }
+  .controls:hover { border-color: rgba(79, 140, 255, 0.5); }
+
+  .hint {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    font-size: 0.8rem; color: rgba(232, 234, 240, 0.55);
+    pointer-events: none; white-space: nowrap;
+  }
+
+  .notes {
+    margin-top: 22px;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 22px 26px;
+  }
+  .notes h2 { font-size: 1rem; font-weight: 600; color: #4f8cff; margin: 18px 0 8px; }
+  .notes h2:first-child { margin-top: 0; }
+  .notes ul { padding-left: 1.25em; }
+  .notes li { font-size: 0.88rem; line-height: 1.85; color: #e8eaf0; margin-bottom: 5px; }
+  .notes code {
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 0.82em; color: #9fc1ff;
+    background: rgba(79, 140, 255, 0.12);
+    padding: 1px 5px; border-radius: 6px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="../index.html">← 画廊</a>
+  <h1>👆 按压挤压</h1>
+  <div class="src">
+    <code>wisland/ui/island.py:828</code> _update_geometry() 按压形变 disp<br>
+    <code>wisland/ui/island.py:1061</code> _poll_hover() 按下驱动 · <code>wisland/ui/island.py:267</code> poke 弹簧 · <code>wisland/ui/anim.py:32</code> Spring.step()
+  </div>
+</header>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div class="hud">
+    <div class="row"><span>状态</span><b id="hState">静止</b></div>
+    <div class="row"><span>弹簧值 pk</span><b id="hPk">0.000</b></div>
+    <div class="row"><span>位移幅度 amp</span><b id="hAmp">+0.0 px</b></div>
+    <div class="row"><span>凹陷中心 u0</span><b id="hU0">—</b></div>
+    <div class="row"><span>面积变化 ΔS</span><b id="hDs">0.0 %</b></div>
+  </div>
+  <label class="controls" for="vc">
+    <input type="checkbox" id="vc" checked>
+    体积守恒（+0.35 补偿）
+  </label>
+  <div class="hint">按住胶囊并拖动 · 凹陷跟随光标 · 松开回弹外鼓</div>
+</div>
+
+<section class="notes">
+  <h2>为什么值得借鉴</h2>
+  <ul>
+    <li>按压反馈不是整体缩放，而是「光标处凹进、其余略鼓」的软材质形变——手指按在水滴上的直觉一致（island.py:828 注释原话）。</li>
+    <li>凹陷中心每帧以 0.3 的比例平滑追赶光标，拖得再快凹陷也不会瞬移，形变自带「惯性」（island.py:269 注释「平滑后的按压位置（凹陷跟着鼠标滑动）」）。</li>
+    <li>松开用欠阻尼弹簧回弹，「弹回时会外鼓几下」（island.py:1064 注释）——比 ease-out 更像液体恢复表面张力，是「活的」手感。</li>
+    <li>按压力度随光标位置连续变化：越靠中心越强（<code>depth^1.4</code>），边缘几乎不变形（island.py:1049 注释「越靠近中心挤压越强（边缘处几乎不变形）」），贴边区域留给液桥逻辑，交互热区不打架。</li>
+    <li>形变只作用于「远离屏幕边」的外侧半边，贴边 30% 恒定不动（island.py:789 注释「外侧半边（含两端圆角）都参与」）——按的是外表面，锚点始终稳。</li>
+    <li>体积守恒（+0.35 补偿）让凹陷伴随邻近鼓起，「软体感」才成立；本页开关可直接对比有无补偿的差异。</li>
+  </ul>
+  <h2>实现要点</h2>
+  <ul>
+    <li>弹簧：<code>Spring(0, 380, 0.55, 0.004)</code>（island.py:267），<code>c = 2·ratio·√k</code>（anim.py:16），每帧按 1/240 s 子步进积分（anim.py:37），静止判据 <code>|x−target| &lt; 0.004</code> 且 <code>|v| &lt; 0.032</code>。</li>
+    <li>按下驱动：<code>depth = 1 − min(1, hypot(nx,ny))</code>、<code>target = depth^1.4</code>（island.py:1057-1058），<code>poke.to(target, 260, 0.75)</code>（island.py:1061）；松开 <code>poke.to(0, 380, 0.55)</code> 欠阻尼回弹（源码同场景 island.py:1064 用 <code>to(0, 300, 0.22)</code>，注释「欠阻尼：弹回时会外鼓几下」，同为 ratio &lt; 1）。</li>
+    <li>高斯凹陷：u0 = 光标 x，clamp 到 <code>[cx−half, cx+half]</code>、<code>sig = half·0.5</code>（island.py:797-798），<code>g = exp(−0.5·d²)</code>（island.py:827），<code>disp = amp·wgt²·(−g + 0.35·(1−g))</code>，<code>amp = clamp(pk, −0.6, 1.2)·8.0</code>（island.py:791、828）。</li>
+    <li>边缘权重 <code>wgt = clamp((v − 0.3·depth)/(0.7·depth), 0, 1)</code>（island.py:824）：贴边 30% 恒定不动、外侧渐变参与；「体积守恒」开关即去掉 <code>+0.35·(1−g)</code> 补偿项。</li>
+    <li>轮廓按 4 px 步长采样（island.py:785 <code>body_points(lbody, radii, 4.0)</code>），Catmull-Rom 转三次贝塞尔闭合（shape.py:142 <code>poly_path()</code>）；贴边两侧内凹圆角 <code>FILLET = 13</code>（island.py:38）。</li>
+    <li>内容随按压缩放 <code>scale(1+0.05·pk, 1−0.16·pk)</code> 并 clip 到形变路径内（island.py:1023、1025）；凹陷位置平滑 <code>poke_sm += (pt − poke_sm)·0.3</code>（island.py:594）。</li>
+  </ul>
+</section>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- anim.py:32 Spring.step()：240Hz 子步进阻尼弹簧 ----------
+  class Spring {
+    constructor(v = 0, k = 300, ratio = 0.8, eps = 0.05) {
+      this.x = v; this.v = 0; this.target = v;
+      this.k = k;
+      this.c = 2 * ratio * Math.sqrt(k);   // anim.py:16
+      this.eps = eps;
+    }
+    to(t, k, ratio) {
+      this.target = t;
+      if (k !== undefined) { this.k = k; this.c = 2 * ratio * Math.sqrt(k); }
+    }
+    step(dt) {
+      if (Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8) {
+        this.x = this.target; this.v = 0; return;
+      }
+      const n = Math.max(1, Math.ceil(dt / (1 / 240)));   // anim.py:37
+      const h = dt / n;
+      for (let i = 0; i < n; i++) {
+        const a = -this.k * (this.x - this.target) - this.c * this.v;
+        this.v += a * h;
+        this.x += this.v * h;
+      }
+    }
+  }
+
+  const clamp = (x, lo, hi) => (x < lo ? lo : x > hi ? hi : x);
+
+  // ---------- 常量（与 wisland 对齐） ----------
+  const FILLET = 13.0;          // island.py:38 贴边两侧内凹圆角
+  const STEP = 4.0;             // island.py:785 采样步长
+  const PILL_H = 64;
+  const PILL_W = 340;
+
+  const poke = new Spring(0, 380, 0.55, 0.004);   // island.py:267
+  const pokePt = { x: 0, y: 0 };                 // island.py:268 _poke_pt
+  const pokeSm = { x: 0, y: 0 };                 // island.py:269 _poke_sm
+  let smInit = false;
+  let pressing = false;
+
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  const stage = document.getElementById("stage");
+  const vcChk = document.getElementById("vc");
+  const hState = document.getElementById("hState");
+  const hPk = document.getElementById("hPk");
+  const hAmp = document.getElementById("hAmp");
+  const hU0 = document.getElementById("hU0");
+  const hDs = document.getElementById("hDs");
+
+  let W = 0, H = 0, cx = 0, x0 = 0, x1 = 0, pillW = PILL_W;
+  let rest = [];
+
+  // ---------- 轮廓采样（等价 shape.py:75 body_points，含贴边内凹圆角） ----------
+  function buildRest() {
+    const F = FILLET, R = PILL_H / 2, pts = [];
+    const line = (ax, ay, bx, by) => {
+      const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / STEP));
+      for (let i = 0; i < n; i++) {
+        const t = i / n;
+        pts.push([ax + (bx - ax) * t, ay + (by - ay) * t]);
+      }
+    };
+    const arc = (acx, acy, r, a0, a1) => {
+      const n = Math.max(2, Math.round(r * Math.abs(a1 - a0) / STEP));
+      for (let i = 0; i < n; i++) {
+        const a = a0 + (a1 - a0) * (i / n);
+        pts.push([acx + r * Math.cos(a), acy + r * Math.sin(a)]);
+      }
+    };
+    line(x0 - F, 0, x1 + F, 0);                       // 顶边（贴屏幕边）
+    arc(x1 + F, F, F, -Math.PI / 2, -Math.PI);        // 右上内凹圆角（表面张力）
+    line(x1, F, x1, PILL_H - R);                      // 右侧
+    arc(x1 - R, PILL_H - R, R, 0, Math.PI / 2);       // 右下全圆角
+    line(x1 - R, PILL_H, x0 + R, PILL_H);             // 底边
+    arc(x0 + R, PILL_H - R, R, Math.PI / 2, Math.PI); // 左下全圆角
+    line(x0, PILL_H - R, x0, F);                      // 左侧
+    arc(x0 - F, F, F, 0, -Math.PI / 2);               // 左上内凹圆角
+    return pts;
+  }
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    W = r.width; H = r.height;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pillW = Math.min(PILL_W, Math.max(160, W - 90));
+    cx = W / 2; x0 = cx - pillW / 2; x1 = cx + pillW / 2;
+    rest = buildRest();
+  }
+
+  // ---------- shape.py:142 poly_path()：Catmull-Rom 转三次贝塞尔闭合 ----------
+  function smoothPath(pts) {
+    const p = new Path2D();
+    const n = pts.length;
+    if (n < 3) return p;
+    p.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n], p1 = pts[i];
+      const p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      p.bezierCurveTo(
+        p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+        p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6,
+        p2[0], p2[1]
+      );
+    }
+    p.closePath();
+    return p;
+  }
+
+  // ---------- island.py:819-831 按压形变 ----------
+  function deform(pk, u0) {
+    const amp = clamp(pk, -0.6, 1.2) * 8.0;          // island.py:791
+    const half = Math.max(20.0, pillW / 2);          // island.py:795
+    const sig = half * 0.5;                          // island.py:798
+    const depth = PILL_H;                            // island.py:796（顶边吸附，near_line = 0）
+    const vc = vcChk.checked;
+    const out = new Array(rest.length);
+    let maxD = 0;
+    for (let i = 0; i < rest.length; i++) {
+      let px = rest[i][0], py = rest[i][1];
+      const v = Math.abs(py - 0);                    // island.py:823 离屏幕边的距离
+      const wgt = clamp((v - depth * 0.3) / (depth * 0.7), 0, 1);   // island.py:824
+      if (wgt > 0) {
+        const d = (px - u0) / sig;
+        const g = Math.exp(-0.5 * d * d);            // island.py:827
+        // 光标处凹进，其余略鼓（体积守恒）；关闭开关即去掉 +0.35 补偿
+        const disp = amp * wgt * wgt * (vc ? (-g + 0.35 * (1 - g)) : -g);  // island.py:828
+        py += disp;                                  // island.py:830 farv = (0,1)
+        if (Math.abs(disp) > maxD) maxD = Math.abs(disp);
+      }
+      out[i] = [px, py];
+    }
+    return { pts: out, amp, maxD };
+  }
+
+  function area(pts) {
+    let a = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      a += p[0] * q[1] - q[0] * p[1];
+    }
+    return Math.abs(a) / 2;
+  }
+
+  // ---------- 交互 ----------
+  function local(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  const inBody = (p) => p.x >= x0 && p.x <= x1 && p.y >= 0 && p.y <= PILL_H;
+
+  // island.py:1054-1061：越靠中心按压越强，target = depth^1.4
+  function updatePress(p) {
+    pokePt.x = p.x; pokePt.y = p.y;
+    if (!smInit) { smInit = true; pokeSm.x = p.x; pokeSm.y = p.y; }
+    const nx = (p.x - cx) / Math.max(1, pillW / 2);
+    const ny = (p.y - PILL_H / 2) / Math.max(1, PILL_H / 2);
+    const depth = 1 - Math.min(1, Math.hypot(nx, ny));
+    const target = Math.pow(depth, 1.4);
+    if (Math.abs(target - poke.target) > 0.01) poke.to(target, 260, 0.75);
+  }
+  function release() {
+    pressing = false;
+    if (poke.target !== 0) poke.to(0, 380, 0.55);    // 欠阻尼：弹回时会外鼓几下
+    cv.style.cursor = "default";
+  }
+
+  cv.addEventListener("pointerdown", (e) => {
+    const p = local(e);
+    if (inBody(p)) {
+      pressing = true;
+      cv.setPointerCapture(e.pointerId);
+      cv.style.cursor = "grabbing";
+      updatePress(p);
+    } else {
+      release();                                      // island.py:1063-1064 离开即带回弹恢复
+    }
+  });
+  cv.addEventListener("pointermove", (e) => {
+    const p = local(e);
+    if (pressing) {
+      // 拖出胶囊范围：带回弹地恢复（island.py:1063-1064 欠阻尼回弹路径）
+      if (inBody(p)) updatePress(p); else release();
+    } else {
+      cv.style.cursor = inBody(p) ? "grab" : "default";
+    }
+  });
+  cv.addEventListener("pointerup", release);
+  cv.addEventListener("pointercancel", release);
+  cv.addEventListener("lostpointercapture", () => { if (pressing) release(); });
+
+  // ---------- 绘制 ----------
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const pk = poke.x;
+    const deforming = Math.abs(pk) > 0.01;
+    const half = Math.max(20.0, pillW / 2);
+    const u0 = clamp(pokeSm.x, cx - half, cx + half);
+    let pts = rest, amp = 0, maxD = 0;
+
+    if (deforming) {
+      const r = deform(pk, u0);
+      pts = r.pts; amp = r.amp; maxD = r.maxD;
+    }
+
+    const path = smoothPath(pts);
+
+    // 形变时画原始轮廓虚线（对照）
+    if (deforming && maxD > 0.35) {
+      ctx.save();
+      ctx.setLineDash([4, 5]);
+      ctx.strokeStyle = "rgba(255,255,255,0.14)";
+      ctx.lineWidth = 1;
+      ctx.stroke(smoothPath(rest));
+      ctx.restore();
+    }
+
+    // 玻璃胶囊本体
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 6;
+    const g = ctx.createLinearGradient(0, 0, 0, PILL_H);
+    g.addColorStop(0, "rgba(79,140,255,0.32)");
+    g.addColorStop(1, "rgba(255,255,255,0.10)");
+    ctx.fillStyle = g;
+    ctx.fill(path);
+    ctx.restore();
+
+    // 凹陷处的强调光晕（高斯足迹）
+    if (deforming && Math.abs(amp) > 0.01) {
+      ctx.save();
+      ctx.clip(path);
+      const a = Math.min(1, Math.abs(amp) / 8);
+      const rg = ctx.createRadialGradient(u0, PILL_H, 2, u0, PILL_H, 72);
+      rg.addColorStop(0, "rgba(79,140,255," + (0.5 * a).toFixed(3) + ")");
+      rg.addColorStop(1, "rgba(79,140,255,0)");
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke(path);
+
+    // 贴边接触线（表面张力）
+    const cg = ctx.createLinearGradient(x0 - FILLET, 0, x1 + FILLET, 0);
+    cg.addColorStop(0, "rgba(79,140,255,0)");
+    cg.addColorStop(0.5, "rgba(79,140,255,0.85)");
+    cg.addColorStop(1, "rgba(79,140,255,0)");
+    ctx.strokeStyle = cg;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x0 - FILLET, 1);
+    ctx.lineTo(x1 + FILLET, 1);
+    ctx.stroke();
+
+    // 内容：随按压缩放（island.py:1023），clip 到形变路径（island.py:1025）
+    ctx.save();
+    ctx.clip(path);
+    ctx.translate(cx, PILL_H / 2);
+    ctx.scale(1 + 0.05 * pk, 1 - 0.16 * pk);
+    ctx.fillStyle = "rgba(232,234,240,0.92)";
+    ctx.font = '600 15px "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("按住我挤压 · 松开回弹", 0, 0);
+    ctx.restore();
+
+    // 按压接触点
+    if ((pressing || Math.abs(pk) > 0.02) && smInit) {
+      const a = clamp(Math.abs(pk) * 2, 0, 1);
+      ctx.save();
+      ctx.strokeStyle = "rgba(79,140,255," + (0.9 * a).toFixed(3) + ")";
+      ctx.fillStyle = "rgba(255,255,255," + (0.85 * a).toFixed(3) + ")";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(pokeSm.x, pokeSm.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(pokeSm.x, pokeSm.y, 11, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // HUD
+    let ds = 0;
+    if (deforming) ds = (area(pts) - area(rest)) / area(rest) * 100;
+    hState.textContent = pressing ? "按压中" : (Math.abs(pk) > 0.004 ? "回弹中" : "静止");
+    hPk.textContent = pk.toFixed(3);
+    hAmp.textContent = (amp >= 0 ? "+" : "") + amp.toFixed(1) + " px";
+    hU0.textContent = deforming ? Math.round(u0) + " px" : "—";
+    hDs.textContent = deforming ? ((ds >= 0 ? "+" : "") + ds.toFixed(1) + " %") : "0.0 %";
+  }
+
+  // ---------- 主循环 ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    // island.py:591-594：凹陷位置平滑跟随光标
+    if ((Math.abs(poke.x) > 0.01 || poke.target) && smInit) {
+      pokeSm.x += (pokePt.x - pokeSm.x) * 0.3;
+      pokeSm.y += (pokePt.y - pokeSm.y) * 0.3;
+    }
+    poke.step(dt);
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener("resize", resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

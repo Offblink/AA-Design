@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>液态贴边 · AA-Design</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a10; color:#e8eaf0; min-height:100vh;
+  font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+}
+header { padding:32px 24px 8px; max-width:960px; margin:0 auto; }
+header a { color:rgba(232,234,240,0.55); text-decoration:none; font-size:0.85rem; }
+header a:hover { color:#4f8cff; }
+header h1 { font-size:1.5rem; font-weight:700; margin-top:10px; }
+header .src { font-family:Consolas,monospace; font-size:0.75rem; color:rgba(232,234,240,0.4); margin-top:6px; }
+header .src code { color:#7dd3fc; }
+#stage {
+  position:relative; max-width:960px; margin:18px auto 0; height:480px;
+  border-radius:16px; overflow:hidden;
+  background:linear-gradient(160deg,#12161f 0%,#0d1420 55%,#101826 100%);
+  border:1px solid rgba(255,255,255,0.12);
+}
+#stage::after { /* 桌面氛围光 */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(600px 200px at 70% 90%, rgba(79,140,255,0.10), transparent 70%);
+}
+canvas { display:block; width:100%; height:100%; cursor:grab; }
+canvas.grabbing { cursor:grabbing; }
+.hud {
+  position:absolute; top:44px; right:14px; z-index:3;
+  background:rgba(10,10,16,0.72); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; padding:10px 14px; font-family:Consolas,monospace;
+  font-size:0.72rem; line-height:1.75; color:rgba(232,234,240,0.75);
+  backdrop-filter:blur(18px); min-width:172px;
+}
+.hud b { color:#4f8cff; font-weight:600; }
+.hud .on { color:#34d399; } .hud .off { color:#fb923c; }
+.ctl { position:absolute; top:44px; left:14px; z-index:3; display:flex; gap:8px; }
+.ctl button {
+  font:inherit; font-size:0.78rem; padding:7px 16px; border-radius:999px; cursor:pointer;
+  color:#e8eaf0; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  backdrop-filter:blur(18px); transition:all .2s;
+}
+.ctl button:hover { border-color:#4f8cff; color:#4f8cff; }
+.hint {
+  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
+  font-size:0.78rem; color:rgba(232,234,240,0.5); text-align:center; pointer-events:none;
+  background:rgba(10,10,16,0.6); padding:6px 16px; border-radius:999px;
+  border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(18px);
+}
+.notes { max-width:960px; margin:24px auto 60px; padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px) { .notes { grid-template-columns:1fr; } }
+.notes section {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px; padding:20px 22px; backdrop-filter:blur(18px);
+}
+.notes h2 { font-size:1rem; font-weight:600; color:#4f8cff; margin-bottom:12px; }
+.notes li { font-size:0.85rem; line-height:1.75; color:rgba(232,234,240,0.72); margin:8px 0 8px 18px; }
+.notes code { font-family:Consolas,monospace; font-size:0.78rem; color:#7dd3fc; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>🫧 液态贴边 — 表面张力 · 液桥 · 水滴</h1>
+  <div class="src">源出 <code>wisland/ui/shape.py:161 neck_path()</code> · <code>shape.py:220 drip_path()</code> · <code>island.py:38-40 FILLET/BREAK/JOIN</code></div>
+</header>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div class="ctl"><button id="autoBtn">▶ 自动演示</button></div>
+  <div class="hud" id="hud"></div>
+  <div class="hint">按住胶囊向下拖 —— 拉过 <b>64px</b> 液桥断裂、水滴缩回；拖到 <b>30px</b> 内重新连接；松手弹回贴边</div>
+</div>
+
+<div class="notes">
+  <section>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li>把悬浮窗口当成<b>物质</b>而不是矩形：表面张力、液桥、水滴给「移动」一个统一隐喻，用户零学习成本 —— 拖动 = 拉丝，松手 = 回吸。</li>
+      <li>断开阈值 64px 与重连阈值 30px <b>刻意不对称</b>：断开要果断、重连要宽容，临界距离附近不会反复连断抖动。</li>
+      <li>断裂后边缘残留半圆水滴缩回 —— 「断裂有后果」的余韵动画，把状态切换的突兀藏进 0.5s 的物理演出里。</li>
+      <li>贴边处不是直角相接，而是<b>内凹圆角</b>（像水滴沾在墙上）。一条曲线之差，「窗口贴边」变成「液体附着」。</li>
+      <li>液桥随拉伸<b>收腰变细</b>而不是均匀变长 —— 视觉上预告「快断了」，用户能预判临界点。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>实现要点</h2>
+    <ul>
+      <li>常量 <code>FILLET=13</code>（贴边内凹圆角）、<code>BREAK=64</code>（拉断距离）、<code>JOIN=30</code>（重连距离）—— <code>island.py:38-40</code>。</li>
+      <li>液桥是沙漏形贝塞尔路径：腰部半宽 <code>wz</code> 从 <code>half</code> 按 <code>√t</code> 节奏收到 <code>min(7, len×0.035)</code>，两侧配 <code>fe/fb</code> 内凹圆角（<code>shape.py:161</code>）。</li>
+      <li>贴边时本体贴边侧圆角 = <code>base_r × smooth(t×1.8)</code> → 0（直角），由液桥的 <code>fe</code> 补出凹角；液桥消失后恢复全圆角。</li>
+      <li>重连强度弹簧 <code>k=520 ratio=1.0</code>（临界阻尼：重连要顺滑不回弹）；水滴半径 <code>7.5→0，k=160 ratio=0.45</code>（欠阻尼：缩回带一点 Q 弹）。</li>
+      <li>常态圆角呼吸 <code>fillet ×= 1 + 0.07·sin(t×1.7)</code> —— 静止的胶囊也有心跳。</li>
+      <li>本演示用 <code>Path2D</code> 直接构造贝塞尔；原版把轮廓采样成多边形再 Catmull-Rom 平滑（<code>shape.py:147 poly_path()</code>），因为原版还要叠加速度形变与按压波。</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+"use strict";
+const K = 0.5523;                    // 1/4 圆弧三次贝塞尔系数（wisland shape.py:14）
+const FILLET = 13, BREAK = 64, JOIN = 30;
+const BODY_W = 170, BODY_H = 44;
+const BASE_R = Math.min(BODY_H / 2, BODY_W / 2, 30);   // 22
+
+const clamp = (x, lo, hi) => x < lo ? lo : x > hi ? hi : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+
+// —— 阻尼弹簧（移植 wisland ui/anim.py:8 Spring）——
+class Spring {
+  constructor(x, k, ratio, eps = 0.05) {
+    this.x = x; this.v = 0; this.target = x;
+    this.k = k; this.c = 2 * ratio * Math.sqrt(k); this.eps = eps;
+  }
+  to(t) { this.target = t; }
+  snap(x) { this.x = this.target = x; this.v = 0; }
+  get rest() { return Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8; }
+  step(dt) {
+    if (this.rest) { this.x = this.target; this.v = 0; return; }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;   // 240Hz 子步进
+    for (let i = 0; i < n; i++) {
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h; this.x += this.v * h;
+    }
+  }
+}
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const hud = document.getElementById("hud");
+let W = 0, H = 0, DPR = 1;
+const EDGE = 34;                       // 屏幕边缘线的 y
+
+// —— 状态 ——
+let mode = "anchored";                 // anchored | drag | snap
+const fx = new Spring(400, 900, 0.78, 0.2);   // 本体中心 x（wisland 拖拽弹簧 k=900/0.78）
+const fy = new Spring(EDGE + BODY_H / 2, 900, 0.78, 0.2);
+const neckS = new Spring(1, 520, 1.0, 0.01);  // 液桥强度
+let neck = true;                       // 液桥是否存在
+let drips = [];                        // { c, r: Spring }
+let grabDX = 0, grabDY = 0;
+let auto = null;                       // 自动演示时间线
+const t0 = performance.now();
+
+function resize() {
+  const r = cv.parentElement.getBoundingClientRect();
+  DPR = window.devicePixelRatio || 1;
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (mode === "anchored") { fx.snap(clamp(fx.x || W / 2, BODY_W / 2 + 8, W - BODY_W / 2 - 8)); fy.snap(EDGE + BODY_H / 2); }
+}
+window.addEventListener("resize", resize);
+
+// —— 几何：每角独立半径的圆角矩形（shape.py:36 body_path）——
+function bodyPath(x, y, w, h, radii) {
+  const m = Math.min(w, h) / 2;
+  const [tl, tr, br, bl] = radii.map(r => clamp(r, 0, m));
+  const p = new Path2D();
+  p.moveTo(x + tl, y);
+  p.lineTo(x + w - tr, y);
+  if (tr > 0.01) p.bezierCurveTo(x + w - tr + tr * K, y, x + w, y + tr - tr * K, x + w, y + tr);
+  else p.lineTo(x + w, y);
+  p.lineTo(x + w, y + h - br);
+  if (br > 0.01) p.bezierCurveTo(x + w, y + h - br + br * K, x + w - br + br * K, y + h, x + w - br, y + h);
+  else p.lineTo(x + w, y + h);
+  p.lineTo(x + bl, y + h);
+  if (bl > 0.01) p.bezierCurveTo(x + bl - bl * K, y + h, x, y + h - bl + bl * K, x, y + h - bl);
+  else p.lineTo(x, y + h);
+  p.lineTo(x, y + tl);
+  if (tl > 0.01) p.bezierCurveTo(x, y + tl - tl * K, x + tl - tl * K, y, x + tl, y);
+  else p.lineTo(x, y);
+  p.closePath();
+  return p;
+}
+
+// —— 液桥（移植 shape.py:161 neck_path，顶边 m(u,v)=(u,v)）——
+function neckPath(c, length, gap, t, strength, fillet, corner) {
+  if (strength <= 0.01 || gap < -0.5) return null;
+  const tc = clamp(t, 0, 1), ts = Math.sqrt(tc);
+  const half = length / 2;
+  let wz = lerp(half, Math.max(2.5, Math.min(7.0, length * 0.035)), ts);  // 腰部半宽
+  wz = lerp(1.0, wz, strength);
+  const fe = lerp(fillet, fillet * 0.75, tc) * strength;   // 边缘侧内凹圆角
+  const fb = fillet * smooth(tc * 3.0) * strength;         // 本体侧圆角（拉开后才出现）
+  const e = wz + fe;
+  const b = Math.min(wz + fb, Math.max(wz, half - corner * 0.5));
+  const ov = Math.max(Math.min(8.0, corner + 3.0), fillet * (1.0 - tc));  // 没入本体深度
+  const ym = Math.max(gap * 0.5, fe);
+  const yb = gap + 0.5;
+  const hasFlare = yb > ym + 0.5;
+
+  const side = sg => {
+    const segs = [{
+      c1: [c + sg * (wz + (e - wz) * (1 - K)), 0],
+      c2: [c + sg * wz, ym * (1 - K)],
+      p:  [c + sg * wz, ym]
+    }];
+    let end;
+    if (hasFlare) {
+      segs.push({
+        c1: [c + sg * wz, ym + (yb - ym) * K],
+        c2: [c + sg * (b - (b - wz) * K), yb],
+        p:  [c + sg * b, yb]
+      });
+      end = [c + sg * b, gap + ov];
+    } else {
+      end = [c + sg * wz, gap + ov];
+    }
+    return { segs, end };
+  };
+
+  const R = side(1), L = side(-1);
+  const p = new Path2D();
+  p.moveTo(c - e, -1.5);          // 越过边缘线 1.5px 盖缝
+  p.lineTo(c + e, -1.5);
+  p.lineTo(c + e, 0);
+  for (const s of R.segs) p.bezierCurveTo(s.c1[0], s.c1[1], s.c2[0], s.c2[1], s.p[0], s.p[1]);
+  p.lineTo(R.end[0], R.end[1]);
+  p.lineTo(L.end[0], L.end[1]);
+  // 左侧原路反走（控制点互换）
+  for (let i = L.segs.length - 1; i >= 0; i--) {
+    const s = L.segs[i];
+    const from = i > 0 ? L.segs[i - 1].p : [c - e, 0];
+    p.bezierCurveTo(s.c2[0], s.c2[1], s.c1[0], s.c1[1], from[0], from[1]);
+  }
+  p.closePath();
+  return p;
+}
+
+// —— 断开后残留的水滴（移植 shape.py:220 drip_path）——
+function dripPath(c, r) {
+  if (r <= 0.4) return null;
+  const f = r * 0.8;
+  const p = new Path2D();
+  p.moveTo(c - r - f, -1.5);
+  p.lineTo(c + r + f, -1.5);
+  p.lineTo(c + r + f, 0);
+  p.bezierCurveTo(c + r + f * (1 - K), 0, c + r, f * (1 - K), c + r, f * 0.9);
+  p.bezierCurveTo(c + r, f + r * 0.9, c - r, f + r * 0.9, c - r, f * 0.9);
+  p.bezierCurveTo(c - r, f * (1 - K), c - r - f * (1 - K), 0, c - r - f, 0);
+  p.closePath();
+  return p;
+}
+
+// —— 交互 ——
+function pointerPos(e) {
+  const r = cv.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
+}
+function inside(px, py) {
+  const top = fy.x - BODY_H / 2, left = fx.x - BODY_W / 2;
+  return px >= left - 4 && px <= left + BODY_W + 4 && py >= top - 4 && py <= top + BODY_H + 4;
+}
+cv.addEventListener("pointerdown", e => {
+  const [px, py] = pointerPos(e);
+  if (!inside(px, py)) return;
+  auto = null; document.getElementById("autoBtn").textContent = "▶ 自动演示";
+  cv.setPointerCapture(e.pointerId);
+  cv.classList.add("grabbing");
+  mode = "drag";
+  grabDX = fx.x - px; grabDY = fy.y - py;
+  fx.k = 900; fx.c = 2 * 0.78 * Math.sqrt(900);
+  fy.k = 900; fy.c = 2 * 0.78 * Math.sqrt(900);
+});
+cv.addEventListener("pointermove", e => {
+  if (mode !== "drag" || auto) return;
+  const [px, py] = pointerPos(e);
+  fx.to(clamp(px + grabDX, BODY_W / 2 + 4, W - BODY_W / 2 - 4));
+  fy.to(clamp(py + grabDY, EDGE - 10, H - BODY_H / 2 - 4));   // 最多压进屏幕 10px
+});
+function release() {
+  if (mode !== "drag") return;
+  mode = "snap";
+  cv.classList.remove("grabbing");
+  fx.k = 240; fx.c = 2 * 0.74 * Math.sqrt(240);   // 沿边定位：温和回位
+  fy.k = 300; fy.c = 2 * 0.38 * Math.sqrt(300);   // 回吸：欠阻尼大幅回弹（wisland gap k=300/0.38）
+  fy.to(EDGE + BODY_H / 2);                       // fy.v 保留 = 继承抛出速度
+}
+cv.addEventListener("pointerup", release);
+cv.addEventListener("pointercancel", release);
+
+// —— 自动演示时间线 ——
+document.getElementById("autoBtn").addEventListener("click", () => {
+  if (auto) { auto = null; document.getElementById("autoBtn").textContent = "▶ 自动演示"; return; }
+  mode = "drag";
+  fx.k = 900; fx.c = 2 * 0.78 * Math.sqrt(900);
+  fy.k = 900; fy.c = 2 * 0.78 * Math.sqrt(900);
+  fx.to(W / 2);
+  auto = { start: performance.now() };
+  document.getElementById("autoBtn").textContent = "■ 停止演示";
+});
+function stepAuto(now) {
+  if (!auto) return;
+  const t = (now - auto.start) / 1000;
+  const rest = EDGE + BODY_H / 2;
+  if (t < 0.3) fy.to(rest);
+  else if (t < 1.4) fy.to(rest + 100);            // 拉下去 → 中途 64px 断裂
+  else if (t < 2.2) fy.to(rest + 100);            // 停留：水滴缩回
+  else if (t < 3.2) fy.to(rest + 15);             // 拖回来 → 30px 内重连
+  else if (t < 3.3) fy.to(rest + 15);
+  else {
+    auto = null;
+    mode = "snap";
+    fx.k = 240; fx.c = 2 * 0.74 * Math.sqrt(240);
+    fy.k = 300; fy.c = 2 * 0.38 * Math.sqrt(300);
+    fy.to(rest);
+    document.getElementById("autoBtn").textContent = "▶ 自动演示";
+  }
+}
+
+// —— 每帧 ——
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, Math.max(1 / 240, (now - last) / 1000));
+  last = now;
+  stepAuto(now);
+
+  fx.step(dt); fy.step(dt); neckS.step(dt);
+
+  const gap = fy.x - BODY_H / 2 - EDGE;          // 本体顶边到边缘线的距离
+  const gapN = Math.max(0, gap);
+
+  // 状态转换：断裂 / 重连（wisland island.py _update_geometry）
+  if (mode === "drag") {
+    if (neck && gapN > BREAK) {
+      neck = false; neckS.snap(0);
+      drips.push({ c: fx.x, r: (() => { const s = new Spring(7.5, 160, 0.45, 0.05); s.to(0); return s; })() });
+    }
+    if (!neck && gapN < JOIN) { neck = true; neckS.snap(0); neckS.to(1); }
+  } else if (mode === "snap") {
+    if (!neck && gapN < JOIN) { neck = true; neckS.snap(0); neckS.to(1); }
+    if (fy.rest && fx.rest) mode = "anchored";
+  }
+  for (const d of drips) d.r.step(dt);
+  drips = drips.filter(d => !(d.rest || (d.r.x < 0.3 && d.r.v < 0)));
+
+  // 几何
+  const t = clamp(gapN / BREAK, 0, 1);
+  let bh = BODY_H, bw = BODY_W;
+  let squash = 0;
+  if (mode === "snap" && gap < 0) {               // 冲过边缘 → 挤压形变
+    squash = Math.min(-gap, BODY_H * 0.38);
+    bh = BODY_H - squash; bw = BODY_W + squash * 1.1;
+  }
+  let fillet = FILLET;
+  if (mode === "anchored") fillet *= 1 + 0.07 * Math.sin((now - t0) / 1000 * 1.7);  // 圆角呼吸
+  const corner = neck ? BASE_R * smooth(t * 1.8) : BASE_R;
+  const cornerR = lerp(BASE_R, corner, neckS.x);
+  const top = fy.x - bh / 2, left = fx.x - bw / 2;
+
+  const path = bodyPath(left, top, bw, bh, [cornerR, cornerR, BASE_R, BASE_R]);
+  const np = neck ? neckPath(fx.x, bw, gapN, t, neckS.x, fillet, cornerR) : null;
+  if (np) path.addPath(np);
+  for (const d of drips) {
+    const dp = dripPath(d.c, Math.max(0, d.r.x));
+    if (dp) path.addPath(dp);
+  }
+
+  // —— 绘制 ——
+  ctx.clearRect(0, 0, W, H);
+
+  // 屏幕边缘条
+  ctx.fillStyle = "rgba(6,8,14,0.9)";
+  ctx.fillRect(0, 0, W, EDGE);
+  ctx.strokeStyle = "rgba(255,255,255,0.16)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, EDGE + 0.5); ctx.lineTo(W, EDGE + 0.5); ctx.stroke();
+  ctx.fillStyle = "rgba(232,234,240,0.38)";
+  ctx.font = '11px Consolas, monospace';
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillText("屏幕边缘", 14, EDGE / 2);
+
+  // 阈值标线（拖动时显示）
+  if (mode !== "anchored") {
+    ctx.save();
+    ctx.setLineDash([5, 5]); ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(251,146,60,0.55)";
+    ctx.beginPath(); ctx.moveTo(0, EDGE + BREAK + 0.5); ctx.lineTo(W, EDGE + BREAK + 0.5); ctx.stroke();
+    ctx.fillStyle = "rgba(251,146,60,0.8)"; ctx.textAlign = "left";
+    ctx.fillText("BREAK 64px — 拉断", 14, EDGE + BREAK - 9);
+    ctx.strokeStyle = "rgba(52,211,153,0.55)";
+    ctx.beginPath(); ctx.moveTo(0, EDGE + JOIN + 0.5); ctx.lineTo(W, EDGE + JOIN + 0.5); ctx.stroke();
+    ctx.fillStyle = "rgba(52,211,153,0.8)";
+    ctx.fillText("JOIN 30px — 重连", 14, EDGE + JOIN + 14);
+    ctx.restore();
+  }
+
+  // 水滴 + 胶囊（同路径 nonzero 并集）
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 2;
+  const g = ctx.createLinearGradient(0, top, 0, top + bh);
+  g.addColorStop(0, "rgba(52,58,76,0.82)");
+  g.addColorStop(0.5, "rgba(40,44,58,0.78)");
+  g.addColorStop(1, "rgba(46,52,68,0.85)");
+  ctx.fillStyle = g;
+  ctx.fill(path, "nonzero");
+  ctx.restore();
+
+  // 顶部光泽 + 双描边（外暗内亮，与背景分离）
+  const gg = ctx.createLinearGradient(0, top, 0, top + bh);
+  gg.addColorStop(0, "rgba(255,255,255,0.14)");
+  gg.addColorStop(0.5, "rgba(255,255,255,0.0)");
+  gg.addColorStop(1, "rgba(255,255,255,0.06)");
+  ctx.fillStyle = gg; ctx.fill(path, "nonzero");
+  ctx.strokeStyle = "rgba(0,0,0,0.27)"; ctx.lineWidth = 1.6; ctx.stroke(path);
+  ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.lineWidth = 1; ctx.stroke(path);
+
+  // 胶囊内容：时间 + 指示点
+  ctx.fillStyle = "rgba(232,234,240,0.92)";
+  ctx.font = '600 15px "HarmonyOS Sans","Segoe UI",sans-serif';
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  const d = new Date();
+  ctx.fillText(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`, left + 18, top + bh / 2);
+  ctx.fillStyle = neck ? "rgba(52,211,153,0.9)" : "rgba(251,146,60,0.9)";
+  ctx.beginPath(); ctx.arc(left + bw - 16, top + bh / 2, 4, 0, Math.PI * 2); ctx.fill();
+
+  // HUD
+  hud.innerHTML =
+    `<b>mode</b>&nbsp;&nbsp; ${mode}<br>` +
+    `<b>gap</b>&nbsp;&nbsp;&nbsp;&nbsp; ${gap.toFixed(1)} px<br>` +
+    `<b>t</b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ${t.toFixed(2)}<br>` +
+    `<b>neck</b>&nbsp;&nbsp;&nbsp; <span class="${neck ? "on" : "off"}">${neck ? "connected" : "BROKEN"}</span><br>` +
+    `<b>drips</b>&nbsp;&nbsp; ${drips.length}`;
+
+  requestAnimationFrame(frame);
+}
+
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

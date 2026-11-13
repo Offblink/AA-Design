@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🚪 不抢焦点弹层 · AA-Design</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    min-height: 100vh;
+    padding: 40px 20px 72px;
+  }
+  header { max-width: 960px; margin: 0 auto 28px; }
+  header a {
+    color: rgba(232,234,240,0.55);
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color .18s;
+  }
+  header a:hover { color: #4f8cff; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin: 14px 0 8px; }
+  .src {
+    font-size: 0.8rem;
+    color: rgba(232,234,240,0.55);
+    line-height: 1.7;
+    font-family: "Cascadia Mono","Consolas",monospace;
+  }
+  .src b { color: #4f8cff; font-weight: 600; }
+
+  #stage {
+    max-width: 960px;
+    margin: 0 auto;
+    min-height: 420px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; flex: 1; }
+  .card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 16px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 320px;
+  }
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: rgba(232,234,240,0.55);
+    cursor: pointer;
+    user-select: none;
+  }
+  .switch input { accent-color: #4f8cff; cursor: pointer; }
+
+  .zone {
+    position: relative;
+    flex: 1;
+    border: 1px dashed rgba(255,255,255,0.18);
+    border-radius: 12px;
+    background: rgba(0,0,0,0.25);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .hint {
+    font-size: 0.8rem;
+    color: rgba(232,234,240,0.55);
+    text-align: center;
+    line-height: 1.7;
+  }
+  .hint b { color: #e8eaf0; font-weight: 600; }
+  .btn {
+    background: rgba(79,140,255,0.16);
+    border: 1px solid rgba(79,140,255,0.5);
+    color: #e8eaf0;
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .18s;
+  }
+  .btn:hover { background: rgba(79,140,255,0.3); }
+  .btn:active { transform: scale(0.96); }
+  .btn.ghost {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.18);
+  }
+  .btn.ghost:hover { background: rgba(255,255,255,0.12); }
+
+  /* ---- 右键菜单 ---- */
+  .menu {
+    position: absolute;
+    min-width: 168px;
+    background: rgba(24,26,34,0.96);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    transform-origin: top left;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    z-index: 5;
+  }
+  .menu[hidden] { display: none; }
+  .mi {
+    background: transparent;
+    border: 0;
+    color: #e8eaf0;
+    font-family: inherit;
+    font-size: 0.82rem;
+    text-align: left;
+    padding: 7px 14px;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+  .mi:hover { background: rgba(79,140,255,0.28); }
+  .mi.sep { height: 6px; padding: 0; cursor: default; background: transparent; }
+  .mi.sep:hover { background: transparent; }
+  .mi.danger { color: #ff7a85; }
+
+  /* ---- 读数 / 日志 ---- */
+  .readout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    font-size: 0.76rem;
+    color: rgba(232,234,240,0.55);
+  }
+  .readout b { color: #e8eaf0; font-weight: 600; font-family: "Cascadia Mono","Consolas",monospace; }
+  .badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.16);
+  }
+  .badge.armed { background: rgba(79,140,255,0.22); border-color: rgba(79,140,255,0.6); color: #9ec1ff; }
+  .badge.outside { background: rgba(255,122,133,0.2); border-color: rgba(255,122,133,0.6); color: #ffb3ba; }
+  .badge.off { background: rgba(255,255,255,0.05); color: rgba(232,234,240,0.4); }
+
+  .log {
+    height: 74px;
+    overflow-y: auto;
+    font-size: 0.72rem;
+    font-family: "Cascadia Mono","Consolas",monospace;
+    color: rgba(232,234,240,0.55);
+    background: rgba(0,0,0,0.3);
+    border-radius: 9px;
+    padding: 6px 9px;
+    line-height: 1.75;
+    scrollbar-width: thin;
+  }
+  .log .t { color: rgba(79,140,255,0.85); }
+  .log .hi { color: #9ec1ff; }
+  .log .bad { color: #ffb3ba; }
+  .log .ok { color: #8fe3b0; }
+
+  /* ---- 焦点锁 ---- */
+  .locks { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chip {
+    font-size: 0.75rem;
+    font-family: "Cascadia Mono","Consolas",monospace;
+    padding: 3px 11px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: rgba(232,234,240,0.45);
+    transform-origin: center;
+  }
+  .chip.on {
+    background: rgba(79,140,255,0.24);
+    border-color: rgba(79,140,255,0.7);
+    color: #9ec1ff;
+    font-weight: 600;
+  }
+  .fg-row {
+    font-size: 0.78rem;
+    color: rgba(232,234,240,0.55);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .fg-row b { color: #e8eaf0; font-family: "Cascadia Mono","Consolas",monospace; font-weight: 600; }
+  .fg-row .dot { width: 7px; height: 7px; border-radius: 50%; background: #8fe3b0; }
+  .fg-row .dot.away { background: #ffb45c; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .popup {
+    position: relative;
+    background: rgba(24,26,34,0.96);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transform-origin: top center;
+  }
+  .popup[hidden] { display: none; }
+  .popup label { font-size: 0.75rem; color: rgba(232,234,240,0.55); }
+  .popup input {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 999px;
+    color: #e8eaf0;
+    font-family: inherit;
+    font-size: 0.84rem;
+    padding: 7px 14px;
+    outline: none;
+  }
+  .popup input:focus { border-color: rgba(79,140,255,0.75); }
+  .focus-tag {
+    align-self: flex-start;
+    font-size: 0.7rem;
+    font-family: "Cascadia Mono","Consolas",monospace;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgba(143,227,176,0.14);
+    border: 1px solid rgba(143,227,176,0.5);
+    color: #8fe3b0;
+  }
+  .focus-tag.released { background: rgba(255,122,133,0.14); border-color: rgba(255,122,133,0.5); color: #ffb3ba; }
+
+  /* ---- 状态机 ---- */
+  .fsm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 8px 6px;
+    border-top: 1px solid rgba(255,255,255,0.09);
+  }
+  .node {
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.14);
+    font-size: 0.8rem;
+    text-align: center;
+    line-height: 1.35;
+    color: rgba(232,234,240,0.55);
+    transition: background .2s, border-color .2s, color .2s;
+  }
+  .node small { display: block; font-size: 0.66rem; opacity: 0.75; }
+  .node.active {
+    background: rgba(79,140,255,0.24);
+    border-color: rgba(79,140,255,0.75);
+    color: #e8eaf0;
+  }
+  .arrow {
+    font-size: 0.7rem;
+    color: rgba(232,234,240,0.45);
+    text-align: center;
+    max-width: 118px;
+    line-height: 1.4;
+  }
+  .arrow .cur { color: #9ec1ff; font-family: "Cascadia Mono","Consolas",monospace; }
+  .fsm-state {
+    width: 100%;
+    text-align: center;
+    font-size: 0.74rem;
+    color: rgba(232,234,240,0.55);
+    font-family: "Cascadia Mono","Consolas",monospace;
+  }
+
+  /* ---- notes ---- */
+  .notes {
+    max-width: 960px;
+    margin: 32px auto 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .notes h2 { font-size: 1rem; font-weight: 600; color: #4f8cff; margin-bottom: 10px; }
+  .notes ol { padding-left: 20px; }
+  .notes li {
+    font-size: 0.86rem;
+    line-height: 1.8;
+    color: rgba(232,234,240,0.78);
+    margin-bottom: 6px;
+  }
+  .notes li code {
+    font-family: "Cascadia Mono","Consolas",monospace;
+    font-size: 0.78rem;
+    color: #9ec1ff;
+    background: rgba(79,140,255,0.1);
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+  @media (max-width: 760px) {
+    .grid, .notes { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>🚪 不抢焦点弹层</h1>
+  <div class="src">
+    <b>wisland/ui/pages/system.py:25</b> _close_on_outside_click() — 25ms armed 轮询 · <b>:31</b> setInterval(25) · <b>:41</b> armed 状态机<br>
+    <b>wisland/ui/lookup.py:114</b> _outside_check() — 查词弹窗同款 armed 模式<br>
+    <b>wisland/ui/island.py:1241</b> request_focus() / <b>:1258</b> release_focus() — focus 锁的获取与归还<br>
+    <b>wisland/ui/island.py:1037</b> _poll_hover() <b>:1039-1041</b> 前台一变立即释放 · <b>:1091</b> locks 非空不收起 · <b>pages/info.py:195</b> locks.add("menu")
+  </div>
+</header>
+
+<div id="stage">
+  <div class="grid">
+
+    <!-- ========== 菜单：25ms armed 轮询 ========== -->
+    <div class="card">
+      <div class="card-head">
+        <span>🖱️ 右键菜单 · armed 轮询</span>
+        <label class="switch"><input type="checkbox" id="pollToggle" checked><span>25ms 轮询</span></label>
+      </div>
+
+      <div class="zone" id="zone">
+        <p class="hint">在此区域<b>右键</b>，或点下面按钮打开菜单<br>打开后：点<b>菜单外</b>任意处即关闭</p>
+        <button class="btn" id="openBtn">打开菜单</button>
+
+        <div class="menu" id="menu" hidden>
+          <button class="mi" data-act="复制">复制</button>
+          <button class="mi" data-act="粘贴">粘贴</button>
+          <button class="mi" data-act="重命名">重命名</button>
+          <div class="mi sep"></div>
+          <button class="mi danger" data-act="删除">删除</button>
+          <div class="mi sep"></div>
+          <button class="mi" id="menuClose">✕ 关闭菜单</button>
+        </div>
+      </div>
+
+      <div class="readout">
+        <span>轮询状态 <b class="badge" id="pollState">idle</b></span>
+        <span>tick <b id="tickN">0</b></span>
+        <span>实测间隔 <b id="tickMs">–</b> ms</span>
+        <span>光标 <b id="cursorIn">-</b></span>
+      </div>
+      <div class="log" id="menuLog"></div>
+    </div>
+
+    <!-- ========== 焦点锁 ========== -->
+    <div class="card">
+      <div class="card-head">
+        <span>⌨️ 焦点锁 · request/release_focus</span>
+        <label class="switch"><input type="checkbox" id="focusPollToggle" checked><span>前台比对轮询</span></label>
+      </div>
+
+      <div class="locks" id="locks">
+        <span class="chip" data-lock="pin">pin</span>
+        <span class="chip" data-lock="focus">focus</span>
+        <span class="chip" data-lock="menu">menu</span>
+        <span class="chip" data-lock="lookup">lookup</span>
+      </div>
+
+      <div class="fg-row">
+        <span class="dot" id="fgDot"></span>
+        前台窗口 <b id="fgName">wisland.exe</b>
+        <span id="fgNote">（岛自己在前台）</span>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" id="openInputBtn">打开输入框弹层</button>
+        <button class="btn ghost" id="switchWinBtn">模拟切走前台窗口</button>
+        <button class="btn ghost" id="tryCollapseBtn">尝试自动收起</button>
+      </div>
+
+      <div class="popup" id="inputPopup" hidden>
+        <label for="searchInput">查词（可见即 locks["lookup"]，获焦即 locks["focus"]）</label>
+        <input id="searchInput" type="text" placeholder="输入点什么…">
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
+          <span class="focus-tag" id="focusTag">focus 锁生效 · 键盘归灵动岛</span>
+          <button class="btn ghost" id="closePopupBtn" style="padding:4px 12px;font-size:0.75rem">✕ 关闭弹层</button>
+        </div>
+      </div>
+
+      <div class="readout">
+        <span>比对周期 <b id="focusPollMs">–</b> ms</span>
+        <span>释放延迟 <b id="releaseMs">–</b> ms</span>
+        <span>收起判定 <b id="collapseOk">可收起</b></span>
+      </div>
+      <div class="log" id="focusLog"></div>
+    </div>
+  </div>
+
+  <!-- ========== 实时状态机 ========== -->
+  <div class="fsm">
+    <div class="node active" id="nDis">disarmed<small>等待打开键松开</small></div>
+    <div class="arrow">按键松开<br><span class="cur" id="a1">↓</span></div>
+    <div class="node" id="nArmed">armed<small>已武装·轮询中</small></div>
+    <div class="arrow">按下 ∧ 光标在菜单外<br><span class="cur" id="a2">↓</span></div>
+    <div class="node" id="nOut">outside<small>关闭菜单</small></div>
+    <div class="arrow">回到起点<br><span class="cur" id="a3">↺</span></div>
+    <div class="fsm-state" id="fsmState">menu closed · 轮询已停止（aboutToHide → t.stop()）</div>
+  </div>
+</div>
+
+<div class="notes">
+  <section>
+    <h2>为什么值得借鉴</h2>
+    <ol>
+      <li>灵动岛窗口带 <code>WS_EX_NOACTIVATE</code>、不抢焦点，Qt/QMenu 自带的「点外面关闭」靠失焦触发——在这里永远不会发生，关闭条件必须自己造（system.py:26 注释原话）。</li>
+      <li>不装全局鼠标钩子，只用 <code>GetAsyncKeyState</code> 每 25ms 轮询三枚鼠标键：十行代码，没有钩子泄漏风险，也钓不到别的进程的事件。</li>
+      <li>armed 状态机专治「打开菜单的那次点击」误伤：先等那次按键松开才武装（system.py:41 注释「先等打开菜单的那次按键松开」），否则菜单刚弹出就被同一击关掉。</li>
+      <li>关闭判定只看「按下 ∧ 光标在所有可见菜单之外」，与焦点、z-order、谁在前台完全无关；多菜单并存时任一菜单包含光标就不关。</li>
+      <li>输入框要键盘就必须抢焦点，于是用 <code>locks["focus"]</code> 锁住自动收起；前台窗口一变立即释放，否则灵动岛「会一直保持展开」（island.py:1038 注释）。</li>
+      <li>locks 是一个集合，pin/focus/menu/lookup 任一在位就不收起（island.py:1091）——弹层生命周期与展开生命周期共用同一把锁，机制解耦、状态不打架。</li>
+    </ol>
+  </section>
+  <section>
+    <h2>实现要点</h2>
+    <ol>
+      <li><code>t.setInterval(25)</code>（system.py:31）；<code>aboutToShow</code> 时 <code>armed=False</code> 并启动，<code>aboutToHide</code> 停表（:51-52）——菜单一关轮询立刻归零。</li>
+      <li><code>down()</code> = <code>GetAsyncKeyState(k) &amp; 0x8000</code>，k ∈ {0x01 左键, 0x02 右键, 0x04 中键}（system.py:34）；lookup 弹窗只查 {0x01,0x02} 两键（lookup.py:117）。</li>
+      <li>tick 三分支：不可见→停表（:37-39）；未武装→<code>armed = not down()</code>（:40-42）；武装且按下→光标不在任何可见 QMenu 几何内→close + 停表（:43-49）。</li>
+      <li><code>request_focus()</code>（island.py:1241）四步：存 <code>_prev_fg</code>（:1245）→ 摘掉 <code>WS_EX_NOACTIVATE</code>（:1247）→ <code>AttachThreadInput</code> 借前台线程 → <code>locks.add("focus")</code>（:1256）。</li>
+      <li><code>release_focus()</code>（:1258）三步：恢复 <code>WS_EX_NOACTIVATE</code>（:1264）→ <code>clearFocus()</code> → <code>SetForegroundWindow(_prev_fg)</code> 把前台还回去（:1269）。</li>
+      <li><code>_poll_hover()</code>（:1037）每帧先查 <code>"focus" in locks and GetForegroundWindow() != hwnd</code> → 立即释放（:1039-1041）；展开态下 <code>locks</code> 非空则直接 return 不计时收起（:1091）。</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+
+  /* ================= Spring（移植 wisland：c = 2*ratio*√k） ================= */
+  function spring(k, ratio, v) {
+    return { k, c: 2 * ratio * Math.sqrt(k), v, target: v, vel: 0 };
+  }
+  function stepSpring(s, dt) {
+    const a = s.k * (s.target - s.v) - s.c * s.vel;
+    s.vel += a * dt;
+    s.v += s.vel * dt;
+  }
+  const menuSpring = spring(480, 0.7, 0);   // 菜单弹出
+  const chipSpring = spring(520, 0.72, 1);  // focus 锁徽标（k=520 ratio=0.72，与 Segmented 同参）
+
+  /* ================= 日志 ================= */
+  const t0 = performance.now();
+  function log(box, msg, cls) {
+    const el = document.createElement("div");
+    const ms = Math.round(performance.now() - t0);
+    el.innerHTML = `<span class="t">${String(ms).padStart(5)}ms</span> <span class="${cls || ""}">${msg}</span>`;
+    box.prepend(el);
+    while (box.children.length > 8) box.lastChild.remove();
+  }
+  const menuLog = $("menuLog"), focusLog = $("focusLog");
+
+  /* ================= 全局鼠标键状态（GetAsyncKeyState 的浏览器替身） ================= */
+  let down = false, mx = 0, my = 0, pendingPress = false, pressX = 0, pressY = 0;
+  document.addEventListener("mousemove", e => { mx = e.clientX; my = e.clientY; });
+  document.addEventListener("mousedown", e => {
+    down = true; pendingPress = true; pressX = e.clientX; pressY = e.clientY;
+  });
+  document.addEventListener("mouseup", () => { down = false; });
+  document.addEventListener("mouseleave", () => { down = false; });
+
+  /* ================= locks 集合（island.py:251） ================= */
+  const locks = new Set();
+  function addLock(name, why) {
+    if (locks.has(name)) return;
+    locks.add(name);
+    syncLocks();
+    log(focusLog, `locks.add("${name}") — ${why}`, "ok");
+  }
+  function discardLock(name, why) {
+    if (!locks.delete(name)) return;
+    syncLocks();
+    log(focusLog, `locks.discard("${name}") — ${why}`, "bad");
+  }
+  function syncLocks() {
+    document.querySelectorAll(".chip").forEach(c =>
+      c.classList.toggle("on", locks.has(c.dataset.lock)));
+    const ok = locks.size === 0;
+    $("collapseOk").textContent = ok ? "可收起" : "被拒 " + [...locks].join("+");
+    $("collapseOk").style.color = ok ? "#8fe3b0" : "#ffb3ba";
+  }
+
+  /* ================= ① 25ms armed 轮询（system.py:25） ================= */
+  const menu = $("menu"), zone = $("zone");
+  let menuOpen = false, armed = false, polling = true;
+  let timer = null, ticks = 0, lastTick = 0, tickAvg = 0, state = "closed";
+
+  function pointInMenu(x, y) {
+    if (!menuOpen) return false;
+    const r = menu.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }
+  function cursorInMenu() { return pointInMenu(mx, my); }
+  function setPollBadge(txt, cls) {
+    const b = $("pollState");
+    b.textContent = txt;
+    b.className = "badge" + (cls ? " " + cls : "");
+  }
+  function setFsm(s) {
+    state = s;
+    $("nDis").classList.toggle("active", s === "disarmed" || s === "closed");
+    $("nArmed").classList.toggle("active", s === "armed" || s === "outside");
+    $("nOut").classList.toggle("active", s === "outside" || s === "closing");
+    $("fsmState").textContent =
+      s === "closed"   ? "menu closed · 轮询已停止（aboutToHide → t.stop()）" :
+      s === "disarmed" ? "disarmed · 等待打开菜单的那次按键松开（system.py:41）" :
+      s === "armed"    ? "armed · 每 25ms 查 down() 与光标位置（system.py:43）" :
+                         "outside · 光标不在任何可见菜单几何内 → close()（system.py:47-48）";
+  }
+
+  function openMenu(x, y, how) {
+    if (menuOpen) return;
+    menuOpen = true;
+    armed = false;                       // aboutToShow: st["armed"]=False（system.py:51）
+    ticks = 0; lastTick = 0; tickAvg = 0;
+    menu.hidden = false;
+    const zr = zone.getBoundingClientRect();
+    const mw = 176, mh = 196;
+    menu.style.left = Math.max(6, Math.min(x - zr.left, zr.width - mw - 6)) + "px";
+    menu.style.top  = Math.max(6, Math.min(y - zr.top,  zr.height - mh - 6)) + "px";
+    menuSpring.v = 0; menuSpring.vel = 0; menuSpring.target = 1;
+    addLock("menu", "弹出期间禁止岛自动收起（pages/info.py:195）");
+    setPollBadge("disarmed", "");
+    setFsm("disarmed");
+    log(menuLog, `菜单打开（${how}）· armed=False · 轮询启动`, "hi");
+    if (polling) startTimer();
+    else log(menuLog, "轮询已关闭：菜单不会因外部点击而关", "bad");
+  }
+
+  function closeMenu(why) {
+    if (!menuOpen) return;
+    menuOpen = false;
+    armed = false;
+    menu.hidden = true;
+    menuSpring.target = 0;
+    stopTimer();
+    discardLock("menu", "aboutToHide（pages/info.py:196）");
+    setFsm(why === "outside" ? "closing" : "closed");
+    setPollBadge(polling ? "idle" : "off", polling ? "" : "off");
+    log(menuLog, `菜单关闭（${why}）· 轮询停表`, why === "outside" ? "bad" : "");
+    setTimeout(() => setFsm("closed"), 700);
+  }
+
+  function startTimer() {
+    if (timer) return;
+    timer = setInterval(tick, 25);        // QTimer.setInterval(25)（system.py:31）
+  }
+  function stopTimer() {
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function tick() {
+    const now = performance.now();
+    ticks++;
+    if (lastTick) {
+      const d = now - lastTick;
+      tickAvg = tickAvg ? Math.round(tickAvg * 0.8 + d * 0.2) : d;
+    }
+    lastTick = now;
+    $("tickN").textContent = ticks;
+    $("tickMs").textContent = tickAvg || "25";
+
+    if (!menuOpen) { stopTimer(); return; }        // :37-39 不可见→停表
+    if (!armed) {                                  // :40-42 先等打开键松开
+      pendingPress = false;                        // 打开菜单的那次按下不算外部点击
+      if (!down) {
+        armed = true;
+        setPollBadge("armed", "armed");
+        setFsm("armed");
+        log(menuLog, "armed = true（打开菜单的按键已松开）", "ok");
+      }
+      return;
+    }
+    // 按下 ∧ 光标在菜单外 → 关（:43-49）
+    // 快于 25ms 的点击用按下瞬间的位置补判，等效 GetAsyncKeyState 的键态快照
+    const pressed = down || pendingPress;
+    const px = down ? mx : pressX, py = down ? my : pressY;
+    pendingPress = false;
+    if (pressed) {
+      const inside = pointInMenu(px, py);
+      $("cursorIn").textContent = inside ? "菜单内" : "菜单外";
+      if (!inside) {
+        setPollBadge("outside", "outside");
+        setFsm("outside");
+        log(menuLog, "按下 ∧ 光标在菜单外 → close()", "bad");
+        closeMenu("outside");
+      }
+    } else {
+      $("cursorIn").textContent = pointInMenu(mx, my) ? "菜单内" : "菜单外";
+    }
+  }
+
+  $("pollToggle").addEventListener("change", e => {
+    polling = e.target.checked;
+    if (polling) {
+      if (menuOpen) startTimer();
+      setPollBadge(!menuOpen ? "idle" : (armed ? "armed" : "disarmed"), menuOpen && armed ? "armed" : "");
+      log(menuLog, "轮询开启：每 25ms 查鼠标键", "ok");
+    } else {
+      stopTimer();
+      setPollBadge("off", "off");
+      log(menuLog, "轮询关闭：外部点击将被忽略（等效 Qt 失焦关闭失效）", "bad");
+    }
+  });
+
+  zone.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    openMenu(e.clientX, e.clientY, "右键");
+  });
+  $("openBtn").addEventListener("mousedown", e => {   // 按下即开 → armed 要等这次松开
+    openMenu(e.clientX, e.clientY, "按钮按下");
+  });
+  $("openBtn").addEventListener("contextmenu", e => e.preventDefault());
+
+  menu.addEventListener("mousedown", e => e.stopPropagation());
+  menu.addEventListener("click", e => {
+    const item = e.target.closest(".mi");
+    if (!item) return;
+    if (item.id === "menuClose") { closeMenu("✕ 按钮"); return; }
+    log(menuLog, `菜单项「${item.dataset.act}」执行 · 点击落在菜单内 → 不关`, "ok");
+    closeMenu("菜单项执行");
+  });
+
+  // 对比：轮询关闭时，点菜单外只留一条日志，菜单纹丝不动
+  document.addEventListener("mousedown", e => {
+    if (!menuOpen || polling) return;
+    if (menu.contains(e.target)) return;
+    log(menuLog, "（轮询关闭）外部点击被忽略 → 菜单关不掉", "bad");
+  }, true);
+
+  /* ================= ② 焦点锁（island.py:1241 / :1258 / :1039） ================= */
+  const popup = $("inputPopup");
+  let fgIsland = true, prevFg = null, popupOpen = false;
+  let fgChangedAt = 0, releasedAt = 0;
+
+  function requestFocus(why) {                 // island.py:1241
+    if (!fgIsland) { prevFg = "explorer.exe"; }
+    fgIsland = true;
+    $("fgName").textContent = "wisland.exe";
+    $("fgNote").textContent = "（岛抢到前台）";
+    $("fgDot").classList.remove("away");
+    addLock("focus", why || "输入框需要键盘（island.py:1256）");
+    const tag = $("focusTag");
+    tag.textContent = "focus 锁生效 · 键盘归灵动岛";
+    tag.classList.remove("released");
+    chipSpring.v = 0.4; chipSpring.vel = 6; chipSpring.target = 1;
+  }
+  function releaseFocus(why) {                 // island.py:1258
+    if (!locks.has("focus")) return;
+    discardLock("focus", why || "归还前台（island.py:1264-1269）");
+    if (fgChangedAt) {
+      releasedAt = performance.now();
+      $("releaseMs").textContent = Math.round(releasedAt - fgChangedAt);
+      fgChangedAt = 0;
+    }
+    const tag = $("focusTag");
+    tag.textContent = "前台已切走 · focus 已释放 · WS_EX_NOACTIVATE 恢复";
+    tag.classList.add("released");
+    log(focusLog, "release_focus() → SetForegroundWindow(_prev_fg) 归还前台", "bad");
+  }
+
+  function setFg(island, name, note) {
+    fgIsland = island;
+    $("fgName").textContent = name;
+    $("fgNote").textContent = note;
+    $("fgDot").classList.toggle("away", !island);
+    if (!island) fgChangedAt = performance.now();
+  }
+
+  $("openInputBtn").addEventListener("click", () => {
+    if (popupOpen) return;
+    popupOpen = true;
+    popup.hidden = false;
+    popupSpring.v = 0; popupSpring.vel = 0; popupSpring.target = 1;
+    addLock("lookup", "弹层可见期间持有（ui/lookup.py:101 showEvent）");
+    requestFocus("弹层打开 → request_focus()（island.py:1241）");
+    $("searchInput").focus();
+    log(focusLog, "输入框弹层打开 · 岛带 WS_EX_NOACTIVATE，必须显式抢焦点", "hi");
+  });
+  $("closePopupBtn").addEventListener("click", () => {
+    if (!popupOpen) return;
+    popupOpen = false;
+    popup.hidden = true;
+    releaseFocus("弹层关闭 → release_focus()（island.py:1258）");
+    discardLock("lookup", "弹层隐藏（ui/lookup.py:106 hideEvent）");
+    $("searchInput").blur();
+  });
+  $("searchInput").addEventListener("focus", () => {
+    if (!locks.has("focus")) requestFocus("输入框获得焦点 → locks.add(\"focus\")");
+    else log(focusLog, "输入框获焦 · focus 锁已在位", "");
+  });
+
+  $("switchWinBtn").addEventListener("click", () => {
+    if (!popupOpen) { log(focusLog, "先打开输入框弹层，再模拟切走窗口", ""); return; }
+    if (!fgIsland) { log(focusLog, "前台已经是别的窗口了", ""); return; }
+    setFg(false, "explorer.exe", "（用户切到别的窗口）");
+    log(focusLog, "前台切走 → GetForegroundWindow() != hwnd（island.py:1039）", "hi");
+  });
+
+  $("tryCollapseBtn").addEventListener("click", () => {
+    if (locks.size) {
+      log(focusLog, `收起被拒：if self.locks → return（island.py:1091）locks={${[...locks].join(", ")}}`, "bad");
+    } else {
+      log(focusLog, "locks 为空 → 正常收起（island.py:1091 不拦截）", "ok");
+    }
+  });
+
+  // 前台比对轮询（wisland 放在 _poll_hover 每帧里，这里用 25ms 复刻）
+  let focusTimer = null, lastFocusCheck = 0;
+  function focusTick() {
+    const now = performance.now();
+    if (lastFocusCheck) {
+      $("focusPollMs").textContent = Math.round(now - lastFocusCheck);
+    }
+    lastFocusCheck = now;
+    if (locks.has("focus") && !fgIsland) {        // island.py:1039-1041
+      releaseFocus("GetForegroundWindow() != hwnd → 立即释放（island.py:1039）");
+    }
+  }
+  function startFocusPoll() {
+    if (focusTimer) return;
+    lastFocusCheck = 0;
+    focusTimer = setInterval(focusTick, 25);
+    log(focusLog, "前台比对轮询启动（25ms）", "ok");
+  }
+  function stopFocusPoll() {
+    if (!focusTimer) return;
+    clearInterval(focusTimer); focusTimer = null;
+    log(focusLog, "前台比对轮询已关闭 → 切走窗口后 focus 不会自动释放", "bad");
+    $("focusPollMs").textContent = "–";
+  }
+  $("focusPollToggle").addEventListener("change", e =>
+    e.target.checked ? startFocusPoll() : stopFocusPoll());
+
+  /* ================= rAF：Spring 动画 ================= */
+  const popupSpring = spring(480, 0.7, 0);
+  let prev = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - prev) / 1000, 1 / 30);
+    prev = now;
+
+    stepSpring(menuSpring, dt);
+    if (menuOpen || !menu.hidden) {
+      const s = Math.max(0, menuSpring.v);
+      menu.style.opacity = Math.min(1, s * 1.6);
+      menu.style.transform = `scale(${0.82 + 0.18 * s}) translateY(${(1 - s) * -6}px)`;
+    }
+    stepSpring(popupSpring, dt);
+    if (popupOpen || !popup.hidden) {
+      const s = Math.max(0, popupSpring.v);
+      popup.style.opacity = Math.min(1, s * 1.6);
+      popup.style.transform = `scale(${0.9 + 0.1 * s})`;
+    }
+    stepSpring(chipSpring, dt);
+    const focusChip = document.querySelector('.chip[data-lock="focus"]');
+    if (focusChip) {
+      const s = Math.max(0, chipSpring.v);
+      focusChip.style.transform = `scale(${0.7 + 0.3 * s})`;
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  syncLocks();
+  setFsm("closed");
+  startFocusPoll();
+  log(menuLog, "就绪：右键或点按钮打开菜单", "");
+  log(focusLog, "就绪：打开输入框弹层试试焦点锁", "");
+})();
+</script>
+</body>
+</html>

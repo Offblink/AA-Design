@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎨 色板分层 · AA-Design</title>
+<style>
+  :root{
+    --accent:#4f8cff;
+    --panel:rgba(255,255,255,0.06);
+    --panel-bd:rgba(255,255,255,0.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:#0a0a10;color:#e8eaf0;min-height:100vh;
+    font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    padding:36px 20px 60px;display:flex;flex-direction:column;align-items:center;
+  }
+  header{width:100%;max-width:880px;margin-bottom:22px}
+  header a{color:var(--accent);text-decoration:none;font-size:.95rem}
+  header a:hover{text-decoration:underline}
+  h1{font-size:1.5rem;font-weight:700;margin:12px 0 6px}
+  .src{color:rgba(232,234,240,0.55);font-size:.82rem;font-family:Consolas,"Cascadia Mono",monospace}
+
+  #stage{
+    width:100%;max-width:880px;min-height:500px;border-radius:16px;
+    background:var(--panel);border:1px solid var(--panel-bd);
+    backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    padding:22px;display:flex;flex-direction:column;gap:16px;align-items:center;
+  }
+
+  /* 主题切换按钮 */
+  .switch{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .switch button{
+    font:inherit;font-size:.9rem;color:#e8eaf0;cursor:pointer;
+    background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);
+    border-radius:999px;padding:8px 18px;transition:border-color .2s,background .2s;
+  }
+  .switch button:hover{background:rgba(255,255,255,0.12)}
+  .switch button.on{border-color:var(--accent);background:rgba(79,140,255,0.18);color:#fff}
+
+  /* 演示舞台：身后画面 + 玻璃卡片 */
+  .stage-wrap{
+    position:relative;width:100%;flex:1;min-height:420px;border-radius:14px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .scene{position:absolute;inset:0;transition:none}
+  .blob{position:absolute;border-radius:50%;filter:blur(46px);opacity:.85}
+  .scene .b1{width:300px;height:300px;left:6%;top:8%;background:var(--sc1,#ff7ca2)}
+  .scene .b2{width:340px;height:340px;right:4%;bottom:4%;background:var(--sc2,#3b82f6)}
+  .scene .b3{width:220px;height:220px;left:44%;top:38%;background:var(--sc3,#35c98e)}
+
+  /* 玻璃卡片：色板各层直接上身 */
+  .glass{
+    position:relative;z-index:2;width:min(560px,92%);border-radius:16px;padding:20px 22px;
+    backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid transparent;
+    background-clip:padding-box;
+    box-shadow:0 14px 5px -6px var(--outline-c),0 8px 9px -4px var(--outline-c),0 4px 14px -4px var(--outline-c),
+               inset 0 1px 0 var(--rim1),inset 0 -1px 0 var(--rim2);
+  }
+  .g-title{font-size:1.06rem;font-weight:600;color:var(--tc)}
+  .g-t2{font-size:.86rem;color:var(--t2c);margin-top:3px}
+  .g-t3{font-size:.78rem;color:var(--t3c);margin-top:2px}
+
+  .pills{display:flex;gap:8px;margin:14px 0 12px;flex-wrap:wrap}
+  .pills span{
+    font-size:.8rem;padding:6px 14px;border-radius:999px;
+    background:var(--card-c);color:var(--t2c);transition:background .2s,color .2s;
+  }
+  .pills span.active{background:var(--pill-c);color:var(--pillfg-c);font-weight:600}
+  .pills span:hover{background:var(--hover-c)}
+
+  .bars{display:flex;flex-direction:column;gap:9px;margin-bottom:14px}
+  .bar-row{display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--t2c)}
+  .bar{flex:1;height:6px;border-radius:999px;background:var(--track-c);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:999px;background:var(--fill-c)}
+  .bar.accent i{background:var(--on-c)}
+  .bar-row b{font-weight:500;color:var(--t3c);min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
+
+  .stock{display:flex;gap:14px;padding-top:12px;border-top:1px solid var(--rim2)}
+  .stk{flex:1;background:var(--card-c);border-radius:12px;padding:9px 12px}
+  .stk .n{font-size:.72rem;color:var(--t3c)}
+  .stk .v{font-size:.98rem;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+  .stk.up .v{color:var(--up-c)}
+  .stk.down .v{color:var(--down-c)}
+  .stk .d{font-size:.7rem;color:var(--t3c);margin-top:1px}
+
+  /* 色板数值面板 */
+  .legend{
+    width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:8px;
+  }
+  .leg{
+    background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+    border-radius:12px;padding:9px 12px;font-size:.76rem;color:rgba(232,234,240,0.55);
+  }
+  .leg b{display:block;color:#e8eaf0;font-size:.82rem;font-weight:600;margin-bottom:3px}
+  .leg .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:6px;border:1px solid rgba(255,255,255,.25)}
+  .leg code{font-family:Consolas,"Cascadia Mono",monospace;color:#9fc1ff}
+
+  section.notes{width:100%;max-width:880px;margin-top:26px;display:flex;gap:26px;flex-wrap:wrap}
+  section.notes>div{flex:1;min-width:280px}
+  .notes h2{font-size:1rem;font-weight:600;color:var(--accent);margin-bottom:10px}
+  .notes li{list-style:none;font-size:.88rem;line-height:1.7;color:rgba(232,234,240,0.72);padding-left:16px;position:relative;margin-bottom:7px}
+  .notes li::before{content:"·";position:absolute;left:4px;color:var(--accent);font-weight:700}
+  .notes li b{color:#e8eaf0;font-weight:600}
+  .notes code{font-family:Consolas,"Cascadia Mono",monospace;color:#9fc1ff;font-size:.84em}
+</style>
+</head>
+<body>
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>🎨 色板分层 · 四套主题同屏切换</h1>
+  <div class="src">wisland/ui/theme.py:85 PALETTES、:186 text2()、:189 text3()、:215 pill_text()、:243 up()/down()、:249 rim_top()、:255 outline()、:195 tint_brush()</div>
+</header>
+
+<div id="stage">
+  <div class="switch" id="switch">
+    <button data-k="dark" class="on">🌑 深色毛玻璃</button>
+    <button data-k="light">🌕 浅色毛玻璃</button>
+    <button data-k="rouge">💄 胭脂撞色</button>
+    <button data-k="sky">🌤 晴空渐变</button>
+  </div>
+
+  <div class="stage-wrap" id="wrap">
+    <div class="scene" id="scene">
+      <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+    </div>
+    <div class="glass" id="glass">
+      <div class="g-title">「玻璃与主题」演示卡</div>
+      <div class="g-t2">次级文字 t2：卡片说明、时间戳、股票名称（按本套玻璃底单独调过对比度）</div>
+      <div class="g-t3">弱化文字 t3：分组标题、单位、辅助提示，只够看清层级不抢焦点</div>
+
+      <div class="pills">
+        <span class="active">正在播放</span><span>播客</span><span>稍后听</span><span>收藏</span>
+      </div>
+
+      <div class="bars">
+        <div class="bar-row"><span>进度</span><div class="bar"><i style="width:62%"></i></div><b>62%</b></div>
+        <div class="bar-row"><span>音量</span><div class="bar accent"><i style="width:38%"></i></div><b>38%</b></div>
+        <div class="bar-row"><span>下载</span><div class="bar"><i style="width:85%"></i></div><b>85%</b></div>
+      </div>
+
+      <div class="stock">
+        <div class="stk up"><div class="n">宁德时代</div><div class="v">+2.41%</div><div class="d">红涨 · up</div></div>
+        <div class="stk down"><div class="n">隆基绿能</div><div class="v">−1.07%</div><div class="d">绿跌 · down</div></div>
+        <div class="stk"><div class="n">中芯国际</div><div class="v" style="color:var(--t2c)">— 0.00%</div><div class="d">平盘 · t2 文字</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend" id="legend"></div>
+</div>
+
+<section class="notes">
+  <div>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li><b>t2/t3 不是全局透明度，是逐玻璃底调过的对比度</b>：浅色玻璃底更「实」（不透出身后的深色），文字就得更不透明才可读；深色玻璃透光多，次级文字可以更淡。</li>
+      <li><b>pill 上的文字走独立的 pill_fg</b>：激活胶囊是亮色底块，直接复用正文色会看不清——胭脂主题粉底（FF7CA2）配黑字，其余主题才回落正文色。</li>
+      <li><b>红涨绿跌跟着主题换</b>：A 股习惯红涨（up）绿跌（down），但浅色底上要用更深的红/绿压住小字可读性，深色底上用高亮霓虹色才跳得出来。</li>
+      <li><b>rim 与 outline 也进色板</b>：玻璃的内侧高光（上 60 / 下 14）和外侧暗描边强度逐主题不同——墨黑胭脂底要 140 的重描边才立得住，浅色底只需 40。</li>
+      <li><b>渐变主题用 tint+tint2 纵向渐变</b>：晴空主题从亮蓝 32ABFD 渐到柔白浅杏 F7EFE1，其余主题纯色 tint，一块玻璃随角度变色不靠额外图层。</li>
+    </ul>
+  </div>
+  <div>
+    <h2>实现要点</h2>
+    <ul>
+      <li>四套色板集中在 <code>PALETTES</code>（theme.py:85-122），主题类只按名字取一整套，UI 组件全部通过 <code>theme.text2()/pill()/up()</code> 取色，不写死颜色。</li>
+      <li><code>text2() = text 色 × t2 alpha</code>（theme.py:186-190）：dark <b>0.66/0.45</b>、light <b>0.74/0.56</b>、rouge <b>0.70/0.50</b>、sky <b>0.78/0.60</b>——同一段文字四主题透明度各不相同。</li>
+      <li><code>pill_text()</code>（theme.py:215）优先取 <code>pal["pill_fg"]</code>，缺省回落正文色；rouge 定义 <code>pill_fg:#000000</code>，其 fill/on/up 同为 <code>#FF7CA2</code>。</li>
+      <li><code>up/down</code>（theme.py:243/246）：dark <code>#ff5a52/#35c98e</code>、light <code>#d42c25/#08875a</code>、rouge <code>#FF7CA2/#5fe0b0</code>、sky <code>#d42c25/#06805a</code>。</li>
+      <li><code>tint</code>：dark <code>rgba(28,28,34,120)</code>、light <code>rgba(238,240,245,205)</code>、rouge <code>rgba(0,0,0,205)</code>、sky <code>(50,171,253,215)→(247,239,225,230)</code> 渐变（tint_brush，theme.py:195）。</li>
+      <li>rim/outline（theme.py:249-256）：dark rim1/rim2 = 60/14、outline 黑 70；light 200/60、黑 40；rouge 粉 170/40、黑 140；sky 白 210/70、(12,32,56) 60——本演示用三层 box-shadow + inset 高光近似。</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+/* ============ PALETTES 逐字对应 wisland/ui/theme.py:85-122 ============ */
+const P = {
+  dark: { name:'深色毛玻璃', dark:true,
+    text:[255,255,255], t2:0.66, t3:0.45,
+    tint:[28,28,34,120], tint2:null,
+    card:[255,255,255,26], hover:[255,255,255,30], pill:[255,255,255,52],
+    pillFg:null, track:[255,255,255,34], fill:[255,255,255,235],
+    on:'#3b82f6', up:'#ff5a52', down:'#35c98e',
+    rim1:[255,255,255,60], rim2:[255,255,255,14], outline:[0,0,0,70],
+    scene:['#1b2440','#3b2f66','#174a44'] },
+  light: { name:'浅色毛玻璃', dark:false,
+    text:[16,18,24], t2:0.74, t3:0.56,
+    tint:[238,240,245,205], tint2:null,
+    card:[255,255,255,150], hover:[0,0,0,14], pill:[255,255,255,250],
+    pillFg:null, track:[0,0,0,30], fill:[255,255,255,255],
+    on:'#2f6fe0', up:'#d42c25', down:'#08875a',
+    rim1:[255,255,255,200], rim2:[255,255,255,60], outline:[0,0,0,40],
+    scene:['#cfe0ff','#ffd9e4','#ccf3e4'] },
+  rouge: { name:'胭脂撞色', dark:true,
+    text:[255,255,255], t2:0.70, t3:0.50,
+    tint:[0,0,0,205], tint2:null,
+    card:[255,255,255,24], hover:[255,255,255,34], pill:[255,124,162,235],
+    pillFg:'#000000', track:[255,255,255,36], fill:'#FF7CA2',
+    on:'#FF7CA2', up:'#FF7CA2', down:'#5fe0b0',
+    rim1:[255,124,162,170], rim2:[255,124,162,40], outline:[0,0,0,140],
+    scene:['#3a0f22','#7a2440','#123a30'] },
+  sky: { name:'晴空渐变', dark:false,
+    text:[12,32,56], t2:0.78, t3:0.60,
+    tint:[50,171,253,215], tint2:[247,239,225,230],
+    card:[255,255,255,105], hover:[255,255,255,120], pill:[255,255,255,190],
+    pillFg:null, track:[12,32,56,34], fill:[255,255,255,250],
+    on:'#1667c9', up:'#d42c25', down:'#06805a',
+    rim1:[255,255,255,210], rim2:[255,255,255,70], outline:[12,32,56,60],
+    scene:['#32abfd','#f7efe1','#8fd4ff'] }
+};
+
+/* ---- 颜色工具：hex/[r,g,b,a] 归一成 [r,g,b,a0..255] ---- */
+function norm(c){
+  if (Array.isArray(c)){ const a = c.slice(); if (a.length === 3) a.push(255); return a; }
+  const h = c.replace('#','');
+  const n = parseInt(h.length===3 ? h.split('').map(x=>x+x).join('') : h, 16);
+  return [(n>>16)&255, (n>>8)&255, n&255, 255];
+}
+function rgba(c){ return `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${((c[3]/255)).toFixed(3)})`; }
+function lerpArr(a,b,t){ return a.map((v,i)=>v+(b[i]-v)*t); }
+
+/* ---- 当前（动画中）与目标状态 ---- */
+function snapshot(k){
+  const p = P[k];
+  return {
+    text:norm(p.text), t2:p.t2, t3:p.t3,
+    tint:norm(p.tint), tint2:p.tint2?norm(p.tint2):null,
+    card:norm(p.card), hover:norm(p.hover), pill:norm(p.pill),
+    pillFg:p.pillFg?norm(p.pillFg):null, track:norm(p.track), fill:norm(p.fill),
+    on:norm(p.on), up:norm(p.up), down:norm(p.down),
+    rim1:norm(p.rim1), rim2:norm(p.rim2), outline:norm(p.outline),
+    scene:[norm(p.scene[0]),norm(p.scene[1]),norm(p.scene[2])]
+  };
+}
+let cur = snapshot('dark');
+let tgt = snapshot('dark');
+let curTint2 = null;           // sky 渐变第二色（单独处理 null）
+let tgtTint2 = null;
+let pillFgMix = 0;             // 0=回落正文色，1=用 pill_fg（rAF 平滑过渡）
+
+const root = document.documentElement.style;
+const glass = document.getElementById('glass');
+const scene = document.getElementById('scene');
+
+function apply(s){
+  const t2c = `rgba(${Math.round(s.text[0])},${Math.round(s.text[1])},${Math.round(s.text[2])},${(s.t2).toFixed(3)})`;
+  const t3c = `rgba(${Math.round(s.text[0])},${Math.round(s.text[1])},${Math.round(s.text[2])},${(s.t3).toFixed(3)})`;
+  root.setProperty('--tc', rgba(s.text));
+  root.setProperty('--t2c', t2c);
+  root.setProperty('--t3c', t3c);
+  root.setProperty('--card-c', rgba(s.card));
+  root.setProperty('--hover-c', rgba(s.hover));
+  root.setProperty('--pill-c', rgba(s.pill));
+  root.setProperty('--track-c', rgba(s.track));
+  root.setProperty('--fill-c', rgba(s.fill));
+  root.setProperty('--on-c', rgba(s.on));
+  root.setProperty('--up-c', rgba(s.up));
+  root.setProperty('--down-c', rgba(s.down));
+  root.setProperty('--rim1', rgba(s.rim1));
+  root.setProperty('--rim2', rgba(s.rim2));
+  root.setProperty('--outline-c', rgba(s.outline));
+  // pill 文字色：pill_fg 与正文色按 pillFgMix 交叉淡入
+  let pf;
+  if (tgt.pillFg) pf = lerpArr(s.text, tgt.pillFg, pillFgMix);
+  else pf = s.text;
+  root.setProperty('--pillfg-c', rgba(pf));
+  // 玻璃 tint：sky 走纵向渐变（theme.py:195 tint_brush），其余纯色
+  if (window.__tint2Now){
+    glass.style.background = `linear-gradient(166deg, ${rgba(s.tint)}, ${rgba(window.__tint2Now)})`;
+  } else {
+    glass.style.background = rgba(s.tint);
+  }
+  // 身后画面（供玻璃透色对比）
+  root.setProperty('--sc1', rgba(s.scene[0]));
+  root.setProperty('--sc2', rgba(s.scene[1]));
+  root.setProperty('--sc3', rgba(s.scene[2]));
+}
+
+/* ---- rAF 平滑过渡：切换主题时整套色板插值 ---- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(64, now - last); last = now;
+  const k = 1 - Math.pow(0.002, dt / 400);   // ≈0.4s 收敛
+  let moving = false;
+  for (const key of ['text','tint','card','hover','pill','track','fill','on','up','down','rim1','rim2','outline']){
+    const before = cur[key].slice();
+    cur[key] = lerpArr(cur[key], tgt[key], k);
+    if (cur[key].some((v,i)=>Math.abs(v-before[i])>0.3)) moving = true;
+  }
+  for (const s of ['t2','t3']){
+    const b = cur[s]; cur[s] = b + (tgt[s]-b)*k;
+    if (Math.abs(cur[s]-b)>0.001) moving = true;
+  }
+  for (let i=0;i<3;i++){
+    const b = cur.scene[i];
+    cur.scene[i] = lerpArr(b, tgt.scene[i], k);
+    if (cur.scene[i].some((v,j)=>Math.abs(v-b[j])>0.3)) moving = true;
+  }
+  // tint2（sky 渐变）与 pill_fg 的有无
+  if (tgtTint2){
+    curTint2 = curTint2 ? lerpArr(curTint2, tgtTint2, k) : cur.tint.slice();
+    window.__tint2Now = curTint2; moving = true;
+  } else if (curTint2){
+    curTint2 = lerpArr(curTint2, tgt.tint, k);
+    const far = curTint2.some((v,i)=>Math.abs(v - tgt.tint[i])>1);
+    window.__tint2Now = far ? curTint2 : null;
+    if (far) moving = true; else curTint2 = null;
+  }
+  const wantFg = tgt.pillFg ? 1 : 0;
+  pillFgMix += (wantFg - pillFgMix) * k;
+  if (Math.abs(wantFg - pillFgMix) > 0.01) moving = true; else pillFgMix = wantFg;
+
+  apply(cur);
+  if (moving) requestAnimationFrame(frame);
+  else window.__rafOn = false;
+}
+function kick(){ if (!window.__rafOn){ window.__rafOn = true; last = performance.now(); requestAnimationFrame(frame);} }
+
+/* ---- 数值面板 ---- */
+const legend = document.getElementById('legend');
+function renderLegend(k){
+  const p = P[k];
+  const sw = c => `<span class="sw" style="background:${Array.isArray(c)?rgba(norm(c)):c}"></span>`;
+  const hex = c => Array.isArray(c) ? rgba(norm(c)) : c;
+  legend.innerHTML = `
+    <div class="leg"><b>${sw(p.tint)}tint 玻璃色调</b>${hex(p.tint)}${p.tint2?` → ${hex(p.tint2)}（纵向渐变）`:''}</div>
+    <div class="leg"><b>文字三档</b><code>t2=${p.t2}</code> · <code>t3=${p.t3}</code>（text ${p.text.join(',')} × alpha）</div>
+    <div class="leg"><b>${sw(p.pill)}pill 底 / pill_fg</b>${hex(p.pill)} · fg <code>${p.pillFg||'缺省→正文色'}</code></div>
+    <div class="leg"><b>${sw(p.up)}up 涨 / ${sw(p.down)}down 跌</b><code>${p.up}</code> · <code>${p.down}</code>（A股红涨绿跌）</div>
+    <div class="leg"><b>${sw(p.fill)}fill / ${sw(p.track)}track</b>${hex(p.fill)} · ${hex(p.track)}</div>
+    <div class="leg"><b>rim 高光 / outline 描边</b>${hex(p.rim1)}/${hex(p.rim2)} · ${hex(p.outline)}</div>`;
+}
+
+/* ---- 切换 ---- */
+document.getElementById('switch').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#switch button').forEach(x => x.classList.toggle('on', x === b));
+  const k = b.dataset.k;
+  tgt = snapshot(k);
+  tgtTint2 = tgt.tint2 ? tgt.tint2.slice() : null;
+  if (!tgtTint2) window.__tint2Now = null;
+  curTint2 = curTint2 || null;
+  renderLegend(k);
+  kick();
+});
+
+renderLegend('dark');
+apply(cur);
+</script>
+</body>
+</html>

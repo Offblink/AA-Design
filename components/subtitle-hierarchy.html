@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>🔤 字幕双行层级 · AA-Design</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 56px;
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+  }
+  header { max-width: 820px; margin: 0 auto 20px; }
+  a.back {
+    color: rgba(232,234,240,0.55);
+    text-decoration: none;
+    font-size: 0.88rem;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 999px;
+    padding: 6px 14px;
+    display: inline-block;
+    transition: background .15s, color .15s;
+  }
+  a.back:hover { background: rgba(79,140,255,0.18); color: #e8eaf0; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin: 14px 0 6px; }
+  .src { color: rgba(232,234,240,0.55); font-size: 0.78rem; line-height: 1.7; margin: 0; }
+
+  #stage {
+    max-width: 820px;
+    margin: 22px auto 0;
+    min-height: 460px;
+    padding: 20px 18px 16px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* ---- 胶囊 ---- */
+  #capsuleZone { width: 100%; height: 118px; display: flex; align-items: center; justify-content: center; }
+  #capsule {
+    position: relative;
+    width: 150px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    overflow: hidden;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.4);
+  }
+  .layer { position: absolute; inset: 0; }
+  #idleLayer { display: flex; align-items: center; justify-content: center; font-size: 13px; color: rgba(232,234,240,0.9); letter-spacing: 0.04em; }
+  .line { position: absolute; left: 18px; right: 18px; text-align: center; white-space: nowrap; overflow: hidden; }
+  #lineJp { font-size: 12px; line-height: 18px; height: 18px; color: rgba(232,234,240,0.62); }
+  #lineZh { font-size: 15px; font-weight: 600; line-height: 24px; height: 24px; color: #e8eaf0; }
+  #badges { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: none; gap: 5px; }
+  #badges.on { display: flex; }
+  #badges i { width: 7px; height: 7px; border-radius: 999px; background: #ff4d4f; box-shadow: 0 0 6px rgba(255,77,79,0.7); }
+
+  /* ---- 状态读数 ---- */
+  #readout { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip {
+    font-size: 0.75rem;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(232,234,240,0.55);
+    white-space: nowrap;
+  }
+  .chip b { color: #e8eaf0; font-weight: 600; }
+  .chip .acc { color: #4f8cff; font-weight: 600; }
+
+  /* ---- 7s 保留读秒 ---- */
+  #hold { width: 100%; max-width: 640px; }
+  #holdLabel { display: block; font-size: 0.78rem; color: rgba(232,234,240,0.55); margin-bottom: 6px; }
+  #holdLabel b { color: #4f8cff; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .track { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  #holdFill { height: 100%; width: 0%; border-radius: 999px; background: #4f8cff; transition: none; }
+
+  /* ---- 控制 ---- */
+  #controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .btn {
+    font-family: inherit;
+    font-size: 0.85rem;
+    color: #e8eaf0;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 8px 15px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .1s;
+  }
+  .btn:hover { background: rgba(79,140,255,0.18); border-color: rgba(79,140,255,0.5); }
+  .btn:active { transform: scale(0.96); }
+  .btn.on { background: rgba(79,140,255,0.22); border-color: #4f8cff; }
+
+  /* ---- 事件流 ---- */
+  #log {
+    width: 100%;
+    height: 148px;
+    overflow: hidden;
+    padding: 9px 14px;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    font-size: 0.75rem;
+    line-height: 1.72;
+    color: rgba(232,234,240,0.55);
+    font-variant-numeric: tabular-nums;
+  }
+  #log div::before { content: "› "; color: #4f8cff; }
+
+  /* ---- 说明 ---- */
+  .notes { max-width: 820px; margin: 30px auto 0; }
+  .notes h2 { font-size: 1rem; font-weight: 600; color: #4f8cff; margin: 26px 0 10px; }
+  .notes ul { margin: 0; padding-left: 20px; }
+  .notes li { font-size: 0.9rem; line-height: 1.75; margin-bottom: 7px; color: #e8eaf0; }
+  .notes li code { font-size: 0.82em; color: rgba(232,234,240,0.72); background: rgba(255,255,255,0.07); border-radius: 6px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="../index.html">← 画廊</a>
+  <h1>🔤 字幕双行层级</h1>
+  <p class="src">wisland/ui/compact.py:476 _paint_subtitle() · compact.py:419 size_hint() 字幕固定宽 · compact.py:357 sub_active() · compact.py:434 paint() 0.28s 淡入 · compact.py:21-22 H_SUB=60 / SUB_HOLD_S=7.0 · wisland/app.py:328-351 实时字幕接线 · wisland/ui/island.py:570 弹簧追尺寸</p>
+</header>
+
+<div id="stage">
+  <div id="capsuleZone">
+    <div id="capsule">
+      <div class="layer" id="idleLayer"><span id="clock">--:--</span></div>
+      <div class="layer" id="subLayer">
+        <div class="line" id="lineJp"></div>
+        <div class="line" id="lineZh"></div>
+      </div>
+      <div id="badges"><i></i><i></i></div>
+    </div>
+  </div>
+
+  <div id="readout">
+    <span class="chip">mode: <span class="acc" id="chipMode">idle</span></span>
+    <span class="chip">尺寸 <b id="chipSize">150 × 34</b></span>
+    <span class="chip" id="chipElide">原文 <b>—</b></span>
+    <span class="chip">字幕流 <b id="chipRun">开启</b></span>
+  </div>
+
+  <div id="hold">
+    <span id="holdLabel">字幕保留剩余 <b id="holdNum">—</b> / SUB_HOLD_S = 7.0s</span>
+    <div class="track"><div id="holdFill"></div></div>
+  </div>
+
+  <div id="controls">
+    <button class="btn" id="btnAuto">▶ 自动句流</button>
+    <button class="btn" id="btnNext">⏭ 下一句</button>
+    <button class="btn" id="btnPrev">⏮ 上一句</button>
+    <button class="btn" id="btnLong">📏 超长句（尾部保留）</button>
+    <button class="btn on" id="btnRun">🎙 字幕开</button>
+    <button class="btn" id="btnBadge">🔴 未读圆点 ×2</button>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<section class="notes">
+  <h2>为什么值得借鉴</h2>
+  <ul>
+    <li><b>双通道信息层级</b>：上行原文 12px × 透明度 0.62，下行译文 15px DemiBold × 全亮——字号与透明度同时分工，视线默认落在译文上，原文只是可选的上下文（源码注释「上面日语（小字，较淡），下面中文（大字）」）。</li>
+    <li><b>掐头保尾的省略</b>：字幕是流式到达的，最新信息永远在句尾；太长时用 ElideLeft 保留结尾（「最新的话」），丢掉的是已经说完的开头，读到的始终是刚说的那半句。</li>
+    <li><b>固定 640×60 容器</b>：句子长短差异巨大，宽度恒定意味着说话时胶囊不会一直伸缩抖动——「固定宽度：说话时不会一直伸缩」，容器安静，内容才好读。</li>
+    <li><b>7 秒阅读缓冲</b>：最后一句说完后保留 7s 再回原视图，够读完一行译文；安静超时自动回切，不打断音乐 / 时间视图，也不需要用户任何操作。</li>
+    <li><b>字幕是临时仲裁，不是新页面</b>：mode() 里临时活动 &gt; 字幕 &gt; 原视图，字幕结束自动落回常态，同一块胶囊复用全部场景，没有窗口切换成本。</li>
+    <li><b>草稿与定稿共用一条覆盖路径</b>：实时译文增量、最终译文都走 set_sub(zh=…) 原地覆盖，同时刷新读秒——「内容更新」而不是「新事件」，读秒自然续期，不会闪断。</li>
+  </ul>
+
+  <h2>实现要点</h2>
+  <ul>
+    <li>三个常量定死：<code>H_SUB = 60</code>、<code>SUB_HOLD_S = 7.0</code>、<code>W_TEXT = 640</code>（compact.py:21-23）；字幕态尺寸 = <code>W_TEXT + nb×12</code> × 60，每个未读圆点 +12px（compact.py:419）。</li>
+    <li>行几何按胶囊中心对齐：上行矩形 <code>y = cy−22</code> 高 18、下行 <code>y = cy−3</code> 高 24（compact.py:493-494），均水平居中；原文 <code>ui_font(12)</code> 画笔 alpha 0.62（compact.py:483、496），译文 <code>ui_font(15, DemiBold)</code> alpha 1.0（compact.py:483、499）。</li>
+    <li>ElideLeft 流程：先 <code>" ".join(text.split())</code> 归一空白 → 宽度 ≤ 可用宽就原样输出，否则 <code>elidedText(…, ElideLeft)</code>（compact.py:486-490）；本页用 canvas measureText 二分复刻同样的「… + 尾部后缀」。</li>
+    <li>仲裁与读秒：<code>sub_active = sub_on ∧ (jp∨zh) ∧ now−sub_t &lt; 7.0</code>（compact.py:357-358）；<code>set_sub</code> 只写文本并刷新 sub_t（compact.py:350-355），所以草稿、定稿、原文任何一次到达都自动续 7 秒。</li>
+    <li>切换动画双层进行：内容 0.28s ease_out 淡入（compact.py:434），胶囊宽高用阻尼弹簧追目标 k=460、ratio=0.64（island.py:570-571；初始 k=300、ratio=0.62，island.py:239-240），弹簧方程移植自 anim.py:8-41。</li>
+    <li>信号接线：partial / segment → <code>set_sub(jp)</code>、live_zh / final_zh → <code>set_sub(zh)</code>、running_changed → <code>set_sub_running</code>（app.py:328-351）；注意新句到达只覆盖 jp，zh 槽留着上一句直到新译文到达（app.py:333-341 不清 zh），定稿直接覆盖草稿。</li>
+  </ul>
+</section>
+
+<script>
+'use strict';
+
+/* ============ wisland 常量（ui/compact.py:19-23） ============ */
+const H_IDLE = 34, H_SUB = 60, SUB_HOLD_S = 7.0, W_TEXT = 640, W_IDLE = 150, MODE_FADE = 0.28;
+const FONT = '"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+const FONT_J = '12px ' + FONT;
+const FONT_Z = '600 15px ' + FONT;
+
+/* ============ 动画原语（移植 ui/anim.py:53-64、8-41） ============ */
+const easeOut = t => { t = t < 0 ? 0 : t > 1 ? 1 : t; return 1 - (1 - t) ** 3; };
+const now = () => performance.now() / 1000;
+
+class Spring {
+  constructor(value, stiffness, ratio, eps) {
+    this.x = value; this.v = 0; this.target = value;
+    this.k = stiffness; this.c = 2 * ratio * Math.sqrt(stiffness); this.eps = eps;
+  }
+  to(target, stiffness, ratio) {
+    this.target = target;
+    if (stiffness !== undefined) { this.k = stiffness; this.c = 2 * ratio * Math.sqrt(stiffness); }
+  }
+  step(dt) {
+    if (Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8) {
+      this.x = this.target; this.v = 0; return;
+    }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240)));
+    const h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h;
+      this.x += this.v * h;
+    }
+  }
+}
+
+/* ============ 状态（复刻 CompactView 实时字幕字段 compact.py:305-309） ============ */
+const state = {
+  sub_on: true,      // running_changed 接线（app.py:344-345）
+  sub_jp: '',
+  sub_zh: '',
+  sub_t: -100,
+  mode: 'idle',
+  modeT: -10,        // 内容淡入起点（compact.py:434）
+  badges: 0,         // 未读圆点数量
+};
+
+function subActive() {                    // compact.py:357-358
+  return state.sub_on && !!(state.sub_jp || state.sub_zh) && (now() - state.sub_t) < SUB_HOLD_S;
+}
+const badgesW = () => state.badges ? 12 + 12 * state.badges : 0;   // compact.py:502-503
+
+/* ============ DOM ============ */
+const $ = id => document.getElementById(id);
+const capsule = $('capsule'), idleLayer = $('idleLayer'), subLayer = $('subLayer');
+const lineJp = $('lineJp'), lineZh = $('lineZh'), badgesEl = $('badges'), clockEl = $('clock');
+const chipMode = $('chipMode'), chipSize = $('chipSize'), chipElide = $('chipElide'), chipRun = $('chipRun');
+const holdNum = $('holdNum'), holdFill = $('holdFill'), logBox = $('log');
+
+function log(msg) {
+  const el = document.createElement('div');
+  el.textContent = '⏱ ' + now().toFixed(2) + 's  ' + msg;
+  logBox.prepend(el);
+  while (logBox.children.length > 8) logBox.lastChild.remove();
+}
+
+/* ============ 尺寸弹簧（island.py:239-240 初值 / 570-571 追目标 k=460 r=0.64） ============ */
+const sw = new Spring(W_IDLE, 460, 0.64, 0.2);
+const sh = new Spring(H_IDLE, 460, 0.64, 0.2);
+
+/* ============ 文本测量 + ElideLeft（复刻 compact.py:486-490） ============ */
+const mcv = document.createElement('canvas').getContext('2d');
+function textW(s, font) { mcv.font = font; return mcv.measureText(s).width; }
+function collapse(text) { return (text || '').trim().replace(/\s+/g, ' '); }   // " ".join(text.split())
+
+function tail(font, text, w) {
+  text = collapse(text);
+  if (textW(text, font) <= w) return text;
+  const dotsW = textW('…', font);
+  let lo = 0, hi = text.length;
+  while (lo < hi) {                                   // 二分找能放进 w 的最长尾部
+    const mid = (lo + hi + 1) >> 1;
+    if (textW(text.slice(text.length - mid), font) + dotsW <= w) lo = mid;
+    else hi = mid - 1;
+  }
+  return '…' + text.slice(text.length - lo);
+}
+
+/* ============ set_sub / set_sub_running（compact.py:344-355） ============ */
+function setSub(patch, why) {
+  if (patch.jp !== undefined) state.sub_jp = patch.jp;
+  if (patch.zh !== undefined) state.sub_zh = patch.zh;
+  state.sub_t = now();                 // 任何一次到达都刷新读秒 → 7s 续期
+  log(why);
+}
+function setSubRunning(on, why) {
+  state.sub_on = on;
+  if (!on) { state.sub_jp = ''; state.sub_zh = ''; state.sub_t = -100; }   // compact.py:346-348
+  log(why);
+}
+
+/* ============ 句子流：原文先到 → 草稿译文挂上 → 定稿覆盖（app.py:328-351） ============ */
+const SENT = [
+  { jp: 'みなさん、こんにちは。', draft: '大家，下午好。', final: '大家下午好。' },
+  { jp: '今日はいい天気ですね。', draft: '今天天气真好。', final: '今天天气真不错呢。' },
+  { jp: '次の電車はいつ出発しますか。', draft: '下一班电车什么时候出发？', final: '下一趟电车几点发车？' },
+  { jp: '最初の認識は少し混み合いますが、最後の言葉が一番大切なので文末を残すようにしています。長い文章でも必ず句末が保持され、これから話す内容がひと目で読み取れます。',
+    draft: '开头识别有点糊不过句尾最重要所以保留句末。',
+    final: '开头的识别有点糊，但句尾最重要，所以总要保留末尾；再长的句子也保证句末完整，后面要说什么一眼能读到。' },
+];
+let idx = -1, auto = false, nextAt = 0, timers = [];
+const AUTO_GAP = 8.0;                 // 8s > 7s 保留：自动句流时也能看到回切再重现
+
+function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+function emit(i) {
+  clearTimers();
+  idx = (i + SENT.length) % SENT.length;
+  const s = SENT[idx];
+  setSub({ jp: s.jp }, 'segment → set_sub(jp) 原文先到' + (state.sub_zh ? '（zh 槽还是上一句，等新译文）' : '（zh 槽为空 → 译文占位 …）'));
+  timers.push(setTimeout(() => setSub({ zh: s.draft }, 'live_zh → set_sub(zh) 草稿译文先挂到该句，sub_t 续期'), 800));
+  timers.push(setTimeout(() => setSub({ zh: s.final }, 'final_zh → set_sub(zh) 定稿覆盖草稿，sub_t 再续期'), 2200));
+  if (auto) nextAt = now() + AUTO_GAP;
+}
+
+/* ============ 控制 ============ */
+const btnAuto = $('btnAuto'), btnRun = $('btnRun'), btnBadge = $('btnBadge');
+btnAuto.addEventListener('click', () => {
+  auto = !auto;
+  btnAuto.classList.toggle('on', auto);
+  btnAuto.textContent = auto ? '⏸ 暂停句流' : '▶ 自动句流';
+  if (auto) { nextAt = now() + 1.2; log('自动句流开启：每 ' + AUTO_GAP + 's 一句（> 7s 保留，能看到回切）'); }
+  else { log('自动句流暂停（保留读秒继续走）'); }
+});
+$('btnNext').addEventListener('click', () => { emit(idx + 1); if (auto) nextAt = now() + AUTO_GAP; });
+$('btnPrev').addEventListener('click', () => { emit(idx - 1); if (auto) nextAt = now() + AUTO_GAP; });
+$('btnLong').addEventListener('click', () => { emit(SENT.length - 1); if (auto) nextAt = now() + AUTO_GAP; });
+btnRun.addEventListener('click', () => {
+  const on = !state.sub_on;
+  setSubRunning(on, 'running_changed(' + on + ') → set_sub_running' + (on ? '（等待第一句）' : '（清空 jp/zh，回到原视图）'));
+  if (!on && auto) { auto = false; btnAuto.classList.remove('on'); btnAuto.textContent = '▶ 自动句流'; log('字幕流关闭，自动句流一并暂停'); }
+  btnRun.classList.toggle('on', on);
+  btnRun.textContent = on ? '🎙 字幕开' : '🔇 字幕关';
+  chipRun.textContent = on ? '开启' : '关闭';
+});
+btnBadge.addEventListener('click', () => {
+  state.badges = state.badges ? 0 : 2;
+  btnBadge.classList.toggle('on', state.badges > 0);
+  badgesEl.classList.toggle('on', state.badges > 0);
+  const w = state.badges ? W_TEXT + state.badges * 12 : W_TEXT;
+  log('size_hint(): subtitle = ' + W_TEXT + ' + ' + state.badges + '×12 = ' + w + ' × ' + H_SUB + '（compact.py:419）');
+});
+
+/* ============ 事件流初始记录 ============ */
+log('set_sub_running(true) → 实时字幕已开启（compact.py:344）');
+log('sub_active() = false → mode: idle（compact.py:357-358）');
+
+/* ============ 主循环 ============ */
+let last = now(), lastClock = '', lastHoldTxt = '', lastElide = '';
+function frame() {
+  const t = now();
+  const dt = Math.min(0.05, t - last); last = t;
+
+  /* --- mode 仲裁（compact.py:387-400） --- */
+  const m = subActive() ? 'subtitle' : 'idle';
+  if (m !== state.mode) {
+    const prev = state.mode;
+    state.mode = m; state.modeT = t;
+    chipMode.textContent = m;
+    if (m === 'subtitle') log('mode: ' + prev + ' → subtitle（有语音立即显示，0.28s ease_out 交叉淡入）');
+    else log('mode: ' + prev + ' → idle（安静满 7.0s，回到原视图）');
+  }
+
+  /* --- 尺寸目标（compact.py:418-419、424） --- */
+  const tw = m === 'subtitle' ? W_TEXT + state.badges * 12 : W_IDLE + state.badges * 14;
+  const th = m === 'subtitle' ? H_SUB : H_IDLE;
+  if (sw.target !== tw) sw.to(tw, 460, 0.64);
+  if (sh.target !== th) sh.to(th, 460, 0.64);
+  sw.step(dt); sh.step(dt);
+  capsule.style.width = sw.x.toFixed(2) + 'px';
+  capsule.style.height = sh.x.toFixed(2) + 'px';
+
+  /* --- 内容交叉淡入（compact.py:434 fade = ease_out((now-mode_t)/0.28)） --- */
+  const fade = easeOut((t - state.modeT) / MODE_FADE);
+  if (m === 'subtitle') { subLayer.style.opacity = fade; idleLayer.style.opacity = 1 - fade; }
+  else { idleLayer.style.opacity = fade; subLayer.style.opacity = 1 - fade; }
+
+  /* --- 双行几何 + ElideLeft（compact.py:478-500） --- */
+  const h = sh.x, cy = h / 2;
+  const bw = badgesW();
+  lineJp.style.top = (cy - 22).toFixed(1) + 'px';
+  lineZh.style.top = (cy - 3).toFixed(1) + 'px';
+  lineJp.style.right = (18 + bw) + 'px';
+  lineZh.style.right = (18 + bw) + 'px';
+  const w = Math.max(40, sw.x - 36 - bw);
+  const jpTxt = tail(FONT_J, state.sub_jp, w);
+  const zhTxt = tail(FONT_Z, state.sub_zh, w) || '…';      // compact.py:492 译文空 → "…"
+  lineJp.textContent = jpTxt;
+  lineZh.textContent = zhTxt;
+
+  /* --- 读数 --- */
+  chipSize.textContent = Math.round(sw.x) + ' × ' + Math.round(sh.x);
+  const rawJp = collapse(state.sub_jp);
+  const elideTxt = m === 'subtitle' && rawJp
+    ? (rawJp ? '原文 ' + Math.round(textW(rawJp, FONT_J)) + 'px / 可用 ' + Math.round(w) + 'px' + (textW(rawJp, FONT_J) > w ? ' → ElideLeft' : ' → 放得下') : '')
+    : '原文 —';
+  if (elideTxt !== lastElide) { lastElide = elideTxt; chipElide.innerHTML = elideTxt.replace(/^(原文)/, '$1 <b>').replace(/(ElideLeft|放得下|—)$/, '$1</b>'); }
+
+  /* --- 7s 读秒 --- */
+  const has = state.sub_on && !!(state.sub_jp || state.sub_zh);
+  const rem = has ? Math.max(0, SUB_HOLD_S - (t - state.sub_t)) : 0;
+  const txt = has ? rem.toFixed(1) : '—';
+  if (txt !== lastHoldTxt) { lastHoldTxt = txt; holdNum.textContent = txt; }
+  holdFill.style.width = (rem / SUB_HOLD_S * 100).toFixed(1) + '%';
+
+  /* --- 自动句流 --- */
+  if (auto && t >= nextAt) emit(idx + 1);
+
+  /* --- 时钟 --- */
+  const d = new Date();
+  const ck = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  if (ck !== lastClock) { lastClock = ck; clockEl.textContent = ck; }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

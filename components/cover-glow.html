@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎵 封面辉光 · AA-Design</title>
+<style>
+  :root{
+    --accent:#4f8cff;
+    --panel:rgba(255,255,255,0.06);
+    --panel-bd:rgba(255,255,255,0.12);
+    --t2:rgba(232,234,240,0.55);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:#0a0a10;color:#e8eaf0;min-height:100vh;
+    font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    padding:36px 20px 60px;display:flex;flex-direction:column;align-items:center;
+  }
+  header{width:100%;max-width:880px;margin-bottom:22px}
+  header a{color:var(--accent);text-decoration:none;font-size:.95rem}
+  header a:hover{text-decoration:underline}
+  h1{font-size:1.5rem;font-weight:700;margin:12px 0 6px}
+  .src{color:var(--t2);font-size:.82rem;line-height:1.7;font-family:Consolas,"Cascadia Mono",monospace}
+
+  #stage{
+    width:100%;max-width:880px;min-height:480px;border-radius:16px;
+    background:var(--panel);border:1px solid var(--panel-bd);
+    backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    padding:20px;display:flex;gap:24px;align-items:center;justify-content:center;flex-wrap:wrap;
+  }
+
+  /* ---------- 播放卡片（复刻 MediaCard：悬停一个信号驱动整卡） ---------- */
+  .player{
+    position:relative;width:330px;padding:16px 16px 14px;border-radius:16px;
+    background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);
+    box-shadow:0 14px 5px -6px rgba(0,0,0,0.55),0 8px 9px -4px rgba(0,0,0,0.5),0 4px 14px -4px rgba(0,0,0,0.45),
+               inset 0 1px 0 rgba(255,255,255,0.16),inset 0 -1px 0 rgba(255,255,255,0.05);
+  }
+  /* CoverTitle 槽位：宽随卡片、高 = COVER + 30 = 88 */
+  .cover-area{position:relative;height:88px}
+  #cover{
+    display:block;position:absolute;left:50%;top:0;transform:translateX(-50%);
+    width:90px;height:88px;transition:opacity .18s;
+  }
+  /* 标题压封面下沿：底边 = 封面 bottom - 12，文字宽 +20、卡片宽 -16 封顶 */
+  .title-pill{position:absolute;left:0;right:0;top:50px;text-align:center;pointer-events:none}
+  .title-pill span{
+    display:inline-block;max-width:calc(100% - 16px);height:24px;line-height:24px;padding:0 10px;
+    font-size:13.5px;font-weight:600;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    text-shadow:1px 0 rgba(0,0,0,.47),-1px 0 rgba(0,0,0,.47),0 1px rgba(0,0,0,.47),0 -1px rgba(0,0,0,.47);
+  }
+
+  /* 进度条：高 22，轨道中心 y=6，th = 4 + 3*hover */
+  .prog{position:relative;height:22px;margin-top:14px;cursor:pointer;touch-action:none}
+  .track{
+    position:absolute;left:0;right:0;top:6px;transform:translateY(-50%);
+    height:4px;border-radius:999px;background:rgba(232,234,240,0.16);
+  }
+  .fill{height:100%;width:0;border-radius:999px;background:rgba(232,234,240,0.85)}
+  .t-cur,.t-dur{
+    position:absolute;top:10px;font-size:10.5px;color:var(--t2);
+    font-variant-numeric:tabular-nums;font-family:Consolas,"Cascadia Mono",monospace;
+  }
+  .t-cur{left:0}.t-dur{right:0}
+
+  .ctrls{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:14px}
+  .ctrls button{
+    width:34px;height:34px;border-radius:999px;cursor:pointer;display:grid;place-items:center;
+    background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);color:#e8eaf0;
+    transition:background .15s,transform .15s;
+  }
+  .ctrls button:hover{background:rgba(255,255,255,0.14)}
+  .ctrls button:active{transform:scale(.94)}
+  .ctrls button.main{width:40px;height:40px;background:var(--accent);border-color:transparent;color:#fff}
+  .ctrls button.main:hover{background:#6ba1ff}
+  .hint{margin-top:12px;text-align:center;font-size:.76rem;color:var(--t2)}
+
+  /* ---------- 右侧管线面板 ---------- */
+  .side{display:flex;flex-direction:column;gap:10px;width:330px}
+  .pane{
+    background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.10);
+    border-radius:14px;padding:11px 14px;
+  }
+  .pane-h{font-size:.8rem;font-weight:600;color:var(--accent);margin-bottom:9px}
+  .pipe{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .pipe canvas{display:block}
+  #bigart{width:88px;height:88px;border-radius:16px}
+  #px1{width:64px;height:64px;border-radius:8px;image-rendering:pixelated;image-rendering:crisp-edges;border:1px solid rgba(255,255,255,.2)}
+  .arrow{flex:1;text-align:center;font-size:.7rem;line-height:1.5;color:var(--t2)}
+  .arrow b{display:block;color:#9fc1ff;font-weight:600}
+  .hsvrow{display:flex;flex-direction:column;gap:5px;margin-top:10px;font-size:.72rem;color:var(--t2)}
+  .swbox{display:flex;align-items:center;gap:7px;min-width:0}
+  .swbox i{width:22px;height:22px;border-radius:6px;flex:none;border:1px solid rgba(255,255,255,.25)}
+  .swbox code{font-family:Consolas,"Cascadia Mono",monospace;color:#9fc1ff;font-size:.72rem}
+  .swbox em{display:block;font-style:normal;white-space:nowrap}
+  .fx{flex:none;text-align:center;font-size:.66rem;line-height:1.6;color:rgba(232,234,240,0.45);white-space:nowrap;
+      padding:3px 0;border-top:1px dashed rgba(255,255,255,0.10);border-bottom:1px dashed rgba(255,255,255,0.10)}
+  .fx b{color:#e8eaf0;font-weight:600}
+
+  .picker{display:flex;gap:10px}
+  .picker button{
+    padding:0;border:2px solid transparent;border-radius:16px;overflow:hidden;cursor:pointer;
+    background:none;transition:border-color .15s,transform .15s;line-height:0;
+  }
+  .picker button:hover{transform:translateY(-2px)}
+  .picker button.on{border-color:var(--accent)}
+  .picker canvas{width:52px;height:52px;display:block;border-radius:13px}
+
+  .ro{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;font-size:.74rem;color:var(--t2)}
+  .ro div{display:flex;justify-content:space-between;gap:6px;padding:4px 8px;background:rgba(255,255,255,0.04);border-radius:8px}
+  .ro b{color:#e8eaf0;font-weight:600;font-variant-numeric:tabular-nums;font-family:Consolas,"Cascadia Mono",monospace}
+
+  section.notes{width:100%;max-width:880px;margin-top:26px;display:flex;gap:26px;flex-wrap:wrap}
+  section.notes>div{flex:1;min-width:280px}
+  .notes h2{font-size:1rem;font-weight:600;color:var(--accent);margin-bottom:10px}
+  .notes li{list-style:none;font-size:.88rem;line-height:1.7;color:rgba(232,234,240,0.72);padding-left:16px;position:relative;margin-bottom:7px}
+  .notes li::before{content:"·";position:absolute;left:4px;color:var(--accent);font-weight:700}
+  .notes li b{color:#e8eaf0;font-weight:600}
+  .notes code{font-family:Consolas,"Cascadia Mono",monospace;color:#9fc1ff;font-size:.84em}
+</style>
+</head>
+<body>
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>🎵 封面辉光 · 悬停微交互与 1px 主色提取</h1>
+  <div class="src">wisland/ui/pages/home.py:71 CoverView、:131 CoverTitle.paintEvent()、:229 MediaCard._set_cover()、:55 Progress.paintEvent()、:174 MediaCard.__init__() Spring(0,260,0.6,0.004)、wisland/ui/widgets.py:597 rounded_pixmap()、wisland/ui/anim.py:8 Spring</div>
+</header>
+
+<div id="stage">
+  <!-- 播放卡片：hover 整卡 → 封面放大上浮 + 主色柔光 + 进度条变粗（同一信号） -->
+  <div class="player" id="player">
+    <div class="cover-area">
+      <canvas id="cover" width="180" height="176"></canvas>
+      <div class="title-pill" id="pill"><span id="pilltext">霓虹夜航  ·  陈屿</span></div>
+    </div>
+    <div class="prog" id="prog">
+      <div class="track" id="track"><div class="fill" id="fill"></div></div>
+      <span class="t-cur" id="tcur">0:00</span>
+      <span class="t-dur" id="tdur">4:13</span>
+    </div>
+    <div class="ctrls">
+      <button id="b-prev" title="上一首" aria-label="上一首"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 5h2.2v14H6zM19.5 5v14L9.5 12z"/></svg></button>
+      <button id="b-play" class="main" title="播放 / 暂停" aria-label="播放 / 暂停">
+        <svg id="i-play" viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M7 4.5l13 7.5-13 7.5z"/></svg>
+        <svg id="i-pause" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="display:none"><path d="M6 4.5h4.2v15H6zM13.8 4.5H18v15h-4.2z"/></svg>
+      </button>
+      <button id="b-next" title="下一首" aria-label="下一首"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15.8 5H18v14h-2.2zM4.5 5v14l10-7z"/></svg></button>
+    </div>
+    <div class="hint">悬停整张卡片：封面 +7% / 上浮 2.5px / 身后透主色柔光，进度条 4→7px 同步</div>
+  </div>
+
+  <div class="side">
+    <div class="pane">
+      <div class="pane-h">① 主色提取 = 把封面缩到 1×1，取那一个像素</div>
+      <div class="pipe">
+        <canvas id="bigart" width="176" height="176"></canvas>
+        <div class="arrow">平滑缩放<b>scaled(1,1)</b>再放大给你看</div>
+        <canvas id="px1" width="1" height="1"></canvas>
+      </div>
+      <div class="hsvrow">
+        <div class="swbox"><i id="sw-raw"></i><em>均色 <code id="hex-raw">#------</code><span id="hsv-in"></span></em></div>
+        <div class="fx"><b>s×1.4+40</b> 上限255<br><b>v</b> 保底170</div>
+        <div class="swbox"><i id="sw-glow"></i><em>辉光色 <code id="hex-glow">#------</code><span id="hsv-out"></span></em></div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="pane-h">② 换一张封面（辉光随新主色立即重算）</div>
+      <div class="picker" id="picker"></div>
+    </div>
+
+    <div class="pane">
+      <div class="pane-h">③ 悬停读数（Spring 实时值）</div>
+      <div class="ro">
+        <div><span>悬停 h</span><b id="ro-h">0.000</b></div>
+        <div><span>封面缩放</span><b id="ro-s">1.000</b></div>
+        <div><span>上浮位移</span><b id="ro-lift">0.0px</b></div>
+        <div><span>柔光 α</span><b id="ro-a">0</b></div>
+        <div><span>进度条粗细</span><b id="ro-th">4.0px</b></div>
+        <div><span>填充亮度</span><b id="ro-fa">0.85</b></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="notes">
+  <div>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li><b>一个悬停信号驱动整卡。</b>封面 h、进度条 hover、卡片反馈全部来自同一个 Spring，放大、上浮、柔光、变粗同步呼吸；不会出现「各控件各自动一下」的割裂感。</li>
+      <li><b>主色提取零成本。</b>封面缩到 1×1 取那一个像素 = 全图平均色，Qt/浏览器的平滑缩放自动做面积平均，不遍历像素、不引库，换封面瞬间完成。</li>
+      <li><b>平均色提亮后才配当「光」。</b>原始均色通常偏灰，HSV 里饱和 ×1.4+40、明度保底 170——辉光是光源，要比当颜料的底色更亮更艳。</li>
+      <li><b>微交互克制不抢内容。</b>放大 7%、上浮 2.5px 都是很小的位移，配合柔光足以传达「可点」，符合灵动岛「内容为主、反馈为辅」的气质。</li>
+      <li><b>进度条 hover 变粗即提示。</b>4→7px 同时填充提亮，点击目标变大好点中（费茨定律），「变粗 = 可拖动」不用加任何说明文字。</li>
+      <li><b>柔光按需绘制。</b>h≤0.01 直接跳过辉光，静止时零额外绘制；离开悬停后 α 随 h 线性归零，淡出自然、无残留。</li>
+    </ul>
+  </div>
+  <div>
+    <h2>实现要点（wisland 真实参数）</h2>
+    <ul>
+      <li><b>缩放 / 位移 / 柔光：</b><code>s = 1.0 + 0.07*h</code>，中心上移 <code>2.5*h</code>；径向渐变圆心 = 封面中心 +(0,6)、半径 = 封面宽×<code>0.8</code>、中心 α=<code>round(150*h)</code> 外缘 0，裁剪圆取 <code>cr.adjusted(-10,-6,10,14)</code>（CoverView 版是 ×0.75、(-8,-4,8,14)）。<code>home.py:134-148</code></li>
+      <li><b>取色管线：</b><code>q.scaled(1,1,IgnoreAspectRatio,SmoothTransformation).pixelColor(0,0)</code> → <code>getHsv()</code> → <code>fromHsv(max(0,h), min(255,int(s*1.4)+40), max(170,v))</code>。<code>home.py:233-236</code></li>
+      <li><b>封面裁圆角：</b><code>rounded_pixmap(img, 58, 13, dpr=2.0)</code> 输出 116×116 位图，裁剪半径 <code>13×2=26</code> 物理 px（视觉 13 逻辑 px），<code>KeepAspectRatioByExpanding</code> 居中裁切防拉伸。<code>widgets.py:597-615</code></li>
+      <li><b>悬停物理：</b>enter <code>to(1.0, 260, 0.6)</code>、leave <code>to(0.0, 220, 0.8)</code>（回程更硬、不来回晃），16ms 步进内按 1/240s 子步做半隐式欧拉积分；<code>|x−target|&lt;0.004 且 |v|&lt;0.032</code> 判静止停表。<code>anim.py:8-46 / home.py:200-216</code></li>
+      <li><b>进度条：</b><code>th = 4 + 3*hover</code>（4→7px），填充 <code>theme.text(0.85 + 0.15*hover)</code> 由 0.85 提到 1.0，且与封面共用同一 h。<code>home.py:55、62</code></li>
+      <li><b>标题压封面：</b>底边 = <code>cr.bottom()-12</code>，文字宽 +20、整卡宽 −16 封顶并省略号截断，四向 1px 阴影（dark: 黑 α120）保证压在封面上仍可读。<code>home.py:151-165</code></li>
+    </ul>
+  </div>
+</section>
+
+<script>
+'use strict';
+/* ================= 常量（与 wisland 源码一致） ================= */
+const COVER = 58;            // CoverTitle.COVER           home.py:109
+const RADIUS = 13;           // rounded_pixmap(img,58,13)   home.py:230
+const LW = 90, LH = 88;      // 槽位逻辑尺寸：宽随卡片，高 = COVER+30
+const D = 2;                 // rounded_pixmap dpr=2.0      widgets.py:598
+
+/* ================= 假专辑封面：全部 canvas 现画，零外部图片 ================= */
+function makeArt(paint){
+  const c = document.createElement('canvas');
+  c.width = c.height = 232;
+  paint(c.getContext('2d'), 232);
+  return c;
+}
+const ALBUMS = [
+  {title:'霓虹夜航', sub:'陈屿', paint(g,n){
+    const gr = g.createLinearGradient(0,0,n,n);
+    gr.addColorStop(0,'#ff9a3c'); gr.addColorStop(1,'#c81d4e');
+    g.fillStyle = gr; g.fillRect(0,0,n,n);
+    g.fillStyle = 'rgba(255,226,180,0.95)';
+    g.beginPath(); g.arc(n*0.66, n*0.30, n*0.20, 0, 7); g.fill();
+    g.fillStyle = 'rgba(18,12,38,0.85)'; g.fillRect(0, n*0.78, n, n*0.22);
+    g.fillStyle = 'rgba(255,255,255,0.55)';
+    for(let i=0;i<5;i++) g.fillRect(n*0.10 + i*n*0.16, n*0.85, n*0.09, 3);
+  }},
+  {title:'深海回声', sub:'Luma', paint(g,n){
+    const gr = g.createLinearGradient(0,0,0,n);
+    gr.addColorStop(0,'#0b2f4a'); gr.addColorStop(1,'#2ec4b6');
+    g.fillStyle = gr; g.fillRect(0,0,n,n);
+    g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 4;
+    for(let i=0;i<4;i++){
+      g.beginPath(); g.arc(n*0.5, n*1.1, n*(0.35+i*0.16), Math.PI*1.15, Math.PI*1.85); g.stroke();
+    }
+    g.fillStyle = 'rgba(190,255,244,0.9)';
+    g.beginPath(); g.arc(n*0.30, n*0.28, n*0.09, 0, 7); g.fill();
+  }},
+  {title:'紫色星轨', sub:'拾光社', paint(g,n){
+    const gr = g.createLinearGradient(0,n,n,0);
+    gr.addColorStop(0,'#2b1055'); gr.addColorStop(1,'#b5479d');
+    g.fillStyle = gr; g.fillRect(0,0,n,n);
+    g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 3;
+    for(let i=0;i<3;i++){
+      g.beginPath(); g.arc(n*0.25, n*0.85, n*(0.30+i*0.20), Math.PI*1.6, Math.PI*2.1); g.stroke();
+    }
+    g.fillStyle = '#ffffff';
+    [[0.70,0.25],[0.82,0.45],[0.55,0.15],[0.62,0.50],[0.88,0.20]].forEach(p=>{
+      g.beginPath(); g.arc(n*p[0], n*p[1], 4, 0, 7); g.fill();
+    });
+  }},
+  {title:'绯色晚风', sub:'苏澜', paint(g,n){
+    const gr = g.createLinearGradient(0,0,n,0);
+    gr.addColorStop(0,'#7a0d1e'); gr.addColorStop(1,'#ff758c');
+    g.fillStyle = gr; g.fillRect(0,0,n,n);
+    g.fillStyle = 'rgba(255,216,172,0.9)';
+    g.beginPath(); g.arc(n*0.50, n*0.42, n*0.16, 0, 7); g.fill();
+    g.fillStyle = 'rgba(38,6,16,0.78)';
+    g.beginPath(); g.moveTo(0,n); g.lineTo(n*0.45, n*0.55); g.lineTo(n,n); g.closePath(); g.fill();
+  }},
+];
+const arts = ALBUMS.map(a => makeArt(a.paint));
+
+/* ================= HSV 工具（对齐 Qt getHsv / fromHsv：h 0-359，s/v 0-255） ================= */
+function rgb2hsv(r,g,b){
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx - mn;
+  let h = 0;
+  if(d !== 0){
+    if(mx === r) h = 60 * (((g-b)/d) % 6);
+    else if(mx === g) h = 60 * ((b-r)/d + 2);
+    else h = 60 * ((r-g)/d + 4);
+    if(h < 0) h += 360;
+  }
+  return [h, mx ? Math.round(d/mx*255) : 0, mx];
+}
+function hsv2rgb(h,s,v){
+  s /= 255; v /= 255;
+  const c = v*s, x = c*(1-Math.abs((h/60)%2-1)), m = v-c;
+  let r=0,g=0,b=0;
+  if(h<60){r=c;g=x;} else if(h<120){r=x;g=c;}
+  else if(h<180){g=c;b=x;} else if(h<240){g=x;b=c;}
+  else if(h<300){r=x;b=c;} else {r=c;b=x;}
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
+const hex = c => '#' + c.map(v=>v.toString(16).padStart(2,'0')).join('');
+
+/* ================= Spring（anim.py:8-46 逐行对齐：1/240s 子步半隐式欧拉） ================= */
+class Spring {
+  constructor(x, k, ratio, eps){
+    this.x = x; this.v = 0; this.t = x;
+    this.k = k; this.c = 2*ratio*Math.sqrt(k); this.eps = eps;
+  }
+  to(t, k, ratio){
+    this.t = t;
+    if(k !== undefined){ this.k = k; this.c = 2*ratio*Math.sqrt(k); }
+  }
+  step(dt){
+    if(this.rest){ this.x = this.t; this.v = 0; return; }
+    const n = Math.max(1, Math.ceil(dt/(1/240))), h = dt/n;
+    for(let i=0;i<n;i++){
+      const a = -this.k*(this.x - this.t) - this.c*this.v;
+      this.v += a*h; this.x += this.v*h;
+    }
+  }
+  get rest(){ return Math.abs(this.x - this.t) < this.eps && Math.abs(this.v) < this.eps*8; }
+}
+const sp = new Spring(0, 260, 0.6, 0.004);   // home.py:174 Spring(0, 260, 0.6, 0.004)
+
+/* ================= 状态 ================= */
+let cur = 0, h = 0, drawnH = -1, artDirty = true;
+let glow = [255,255,255], raw = [255,255,255];
+let playing = true, dur = 253, pos = 38, seeking = false;
+
+const $ = s => document.querySelector(s);
+const cv = $('#cover'), ctx = cv.getContext('2d');
+ctx.setTransform(D,0,0,D,0,0);
+const pill = $('#pill'), pilltext = $('#pilltext');
+const player = $('#player'), prog = $('#prog'), track = $('#track'), fill = $('#fill');
+
+/* ================= 1×1 取色（home.py:234-236 的浏览器等价） ================= */
+function extractColor(art){
+  const p1 = $('#px1'), g = p1.getContext('2d', {willReadFrequently:true});
+  g.clearRect(0,0,1,1);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(art, 0, 0, 1, 1);                       // scaled(1,1,Smooth) ≈ 全图面积平均
+  const d = g.getImageData(0,0,1,1).data;
+  const [hh,s,v] = rgb2hsv(d[0], d[1], d[2]);
+  const s2 = Math.min(255, Math.floor(s*1.4) + 40);   // int(s*1.4)+40 上限 255
+  const v2 = Math.max(170, v);                        // 明度保底 170
+  return {raw:[d[0],d[1],d[2]], h:hh, s, v, s2, v2, glow:hsv2rgb(hh, s2, v2)};
+}
+
+function applyAlbum(i){
+  cur = i;
+  const a = arts[i], info = extractColor(a);
+  raw = info.raw; glow = info.glow;
+  // 面板回显
+  const bg = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+  $('#bigart').getContext('2d').drawImage(a, 0, 0, 176, 176);
+  $('#sw-raw').style.background = bg(raw);
+  $('#sw-glow').style.background = bg(glow);
+  $('#hex-raw').textContent = hex(raw);
+  $('#hex-glow').textContent = hex(glow);
+  $('#hsv-in').textContent = ` h${Math.round(info.h)} s${info.s} v${info.v}`;
+  $('#hsv-out').textContent = ` h${Math.round(info.h)} s${info.s2} v${info.v2}`;
+  pilltext.textContent = ALBUMS[i].title + '  ·  ' + ALBUMS[i].sub;
+  artDirty = true;
+}
+
+/* ================= 封面绘制（CoverTitle.paintEvent 等价：home.py:131-150） ================= */
+function rr(g, x, y, w, hgt, r){
+  r = Math.min(r, w/2, hgt/2);
+  g.beginPath();
+  g.moveTo(x+r, y);
+  g.arcTo(x+w, y, x+w, y+hgt, r);
+  g.arcTo(x+w, y+hgt, x, y+hgt, r);
+  g.arcTo(x, y+hgt, x, y, r);
+  g.arcTo(x, y, x+w, y, r);
+  g.closePath();
+}
+function draw(){
+  ctx.clearRect(0, 0, LW, LH);
+  const s = 1 + 0.07*h;                       // home.py:134
+  const size = COVER * s;
+  const cx = LW / 2;
+  const cy = 4 + COVER/2 - 2.5*h;             // home.py:137 上浮 2.5px
+  if(h > 0.01){                               // home.py:138 按需绘制
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy + 4, size/2 + 10, 0, Math.PI*2);   // cr.adjusted(-10,-6,10,14)
+    ctx.clip();
+    const a = (150 * h) / 255;                // home.py:141 α = round(150*h)
+    const gr = ctx.createRadialGradient(cx, cy + 6, 0, cx, cy + 6, size * 0.8); // 圆心+(0,6)，半径×0.8
+    gr.addColorStop(0, `rgba(${glow[0]},${glow[1]},${glow[2]},${a})`);
+    gr.addColorStop(1, `rgba(${glow[0]},${glow[1]},${glow[2]},0)`);
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, LW, LH);
+    ctx.restore();
+  }
+  const x = cx - size/2, y = cy - size/2;
+  ctx.save();
+  rr(ctx, x, y, size, size, RADIUS * (size / COVER));  // 圆角 13（随缩放同比）
+  ctx.clip();
+  ctx.drawImage(arts[cur], x, y, size, size);
+  ctx.restore();
+  // 标题底边始终贴封面 bottom-12（随 h 微移）
+  pill.style.top = (cy + size/2 - 12) + 'px';
+}
+
+/* ================= 进度条（home.py:51-62） ================= */
+const fmt = t => Math.floor(t/60) + ':' + String(Math.floor(t%60)).padStart(2,'0');
+function paintProgress(){
+  fill.style.width = Math.max(4 + 3*h, prog.clientWidth * pos / dur) + 'px'; // home.py:61 max(th, 宽*进度)
+  $('#tcur').textContent = fmt(pos);
+}
+function seekAt(e){
+  const r = prog.getBoundingClientRect();
+  pos = Math.min(dur, Math.max(0, (e.clientX - r.left) / r.width * dur));
+  paintProgress();
+}
+prog.addEventListener('pointerdown', e => {
+  seeking = true; prog.setPointerCapture(e.pointerId); seekAt(e);
+});
+prog.addEventListener('pointermove', e => { if(seeking) seekAt(e); });
+prog.addEventListener('pointerup',   () => { seeking = false; });
+prog.addEventListener('pointercancel', () => { seeking = false; });
+
+/* ================= 悬停 → Spring（home.py:200-216） ================= */
+player.addEventListener('pointerenter', () => { sp.to(1.0, 260, 0.6); });
+player.addEventListener('pointerleave', () => { sp.to(0.0, 220, 0.8); });
+
+/* ================= 控制按钮 ================= */
+$('#b-play').addEventListener('click', () => {
+  playing = !playing;
+  $('#i-play').style.display = playing ? 'none' : '';
+  $('#i-pause').style.display = playing ? '' : 'none';
+});
+const switchTo = i => {
+  i = (i + ALBUMS.length) % ALBUMS.length;
+  cv.style.opacity = '0';
+  setTimeout(() => { applyAlbum(i); cv.style.opacity = '1'; }, 180);
+};
+$('#b-prev').addEventListener('click', () => switchTo(cur - 1));
+$('#b-next').addEventListener('click', () => switchTo(cur + 1));
+
+/* ================= 封面选择器 ================= */
+const picker = $('#picker');
+ALBUMS.forEach((a, i) => {
+  const b = document.createElement('button');
+  b.title = a.title + ' - ' + a.sub;
+  const c = document.createElement('canvas');
+  c.width = c.height = 104;
+  c.getContext('2d').drawImage(arts[i], 0, 0, 104, 104);
+  b.appendChild(c);
+  b.addEventListener('click', () => {
+    picker.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    switchTo(i);
+  });
+  if(i === 0) b.classList.add('on');
+  picker.appendChild(b);
+});
+
+/* ================= 主循环 ================= */
+let lastT = performance.now(), lastSec = -1;
+function loop(now){
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  if(playing){
+    pos += dt;
+    if(pos >= dur) pos = 0;
+  }
+  sp.step(dt);                         // home.py:209 step(0.016)，此处按真实 dt 保物理时间一致；rest 时自动吸附
+  h = Math.max(0, sp.x);               // home.py:210
+  if(Math.abs(h - drawnH) > 0.0006 || artDirty){
+    drawnH = h; artDirty = false;
+    draw();
+    // 读数（th = 4 + 3*h，填充 0.85 + 0.15*h）
+    $('#ro-h').textContent = h.toFixed(3);
+    $('#ro-s').textContent = (1 + 0.07*h).toFixed(3);
+    $('#ro-lift').textContent = (2.5*h).toFixed(1) + 'px';
+    $('#ro-a').textContent = String(Math.round(150*h));
+    $('#ro-th').textContent = (4 + 3*h).toFixed(1) + 'px';
+    $('#ro-fa').textContent = (0.85 + 0.15*h).toFixed(2);
+    track.style.height = (4 + 3*h) + 'px';                  // home.py:55
+    fill.style.background = `rgba(232,234,240,${0.85 + 0.15*h})`; // home.py:62
+    paintProgress();
+  }
+  const sec = Math.floor(pos);
+  if(playing && sec !== lastSec){ lastSec = sec; paintProgress(); }
+  requestAnimationFrame(loop);
+}
+
+applyAlbum(0);
+paintProgress();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

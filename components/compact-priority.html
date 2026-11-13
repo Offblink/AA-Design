@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>📶 收起态内容优先级 · AA-Design</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    min-height: 100vh;
+    padding: 32px 20px 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  header { max-width: 960px; width: 100%; margin-bottom: 20px; }
+  header a.back {
+    display: inline-block;
+    color: rgba(232,234,240,0.55);
+    text-decoration: none;
+    font-size: 0.9rem;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 999px;
+    padding: 5px 14px;
+    transition: background .15s, color .15s;
+  }
+  header a.back:hover { background: rgba(79,140,255,0.18); color: #e8eaf0; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin: 14px 0 8px; }
+  .src {
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: rgba(232,234,240,0.55);
+    border-left: 2px solid #4f8cff;
+    padding-left: 10px;
+  }
+  .src code { font-family: Consolas, "Cascadia Mono", monospace; color: rgba(232,234,240,0.78); }
+
+  /* ---------- 舞台 ---------- */
+  #stage {
+    max-width: 960px;
+    width: 100%;
+    min-height: 500px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  /* 优先级阶梯 */
+  .ladder { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .ladder .chip {
+    font-size: 0.74rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(232,234,240,0.45);
+    background: rgba(255,255,255,0.04);
+    transition: all .2s;
+  }
+  .ladder .chip.on {
+    color: #fff;
+    background: rgba(79,140,255,0.3);
+    border-color: #4f8cff;
+    box-shadow: 0 0 12px rgba(79,140,255,0.35);
+  }
+  .ladder .sep { color: rgba(232,234,240,0.3); font-size: 0.75rem; }
+
+  /* HUD */
+  .hud {
+    font-size: 0.78rem;
+    color: rgba(232,234,240,0.55);
+    text-align: center;
+    line-height: 1.7;
+    font-variant-numeric: tabular-nums;
+    min-height: 42px;
+  }
+  .hud b { color: #4f8cff; font-weight: 600; }
+  .hud .k { color: rgba(232,234,240,0.78); }
+
+  /* ---------- 胶囊 ---------- */
+  .capsule {
+    position: relative;
+    width: 150px;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(14,14,20,0.88);
+    border: 1px solid rgba(255,255,255,0.14);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+    overflow: hidden;
+    flex: none;
+  }
+  .layer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    will-change: opacity;
+  }
+  /* idle：时间 + 天气 + 未读圆点 */
+  .ly-idle { justify-content: space-between; padding: 0 18px; }
+  .ly-idle .clock { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ly-idle .right { display: flex; align-items: center; gap: 8px; }
+  .ly-idle .wx { font-size: 13px; color: rgba(232,234,240,0.7); font-weight: 500; }
+  .dots { display: flex; align-items: center; gap: 6px; }
+  .dots i { width: 8px; height: 8px; border-radius: 50%; display: block; }
+  /* pet：发光双眼 */
+  .ly-pet { justify-content: center; }
+  .ly-pet .face { position: relative; width: 40px; height: 34px; }
+  .ly-pet .eye {
+    position: absolute; top: 6px;
+    width: 11px; height: 15px;
+    border-radius: 5px;
+    background: #e8eaf0;
+    box-shadow: 0 0 8px rgba(232,234,240,0.45);
+  }
+  .ly-pet .eye.l { left: 3px; }
+  .ly-pet .eye.r { right: 3px; }
+  .ly-pet .mouth {
+    position: absolute; left: 50%; top: 21px;
+    width: 10px; height: 5px;
+    transform: translateX(-50%);
+    border: 1.8px solid rgba(232,234,240,0.9);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+  }
+  /* media：封面 + 歌词/歌名 + 播放键 */
+  .ly-media { padding: 0 8px; gap: 10px; }
+  .ly-media .cover {
+    width: 26px; height: 26px; border-radius: 7px; flex: none;
+    background: linear-gradient(135deg, #4f8cff, #9b5cff);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: #fff;
+  }
+  .ly-media .mtext {
+    flex: 1; min-width: 0;
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-align: center;
+  }
+  .ly-media .play {
+    width: 28px; height: 28px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: rgba(232,234,240,0.95);
+    border-radius: 50%;
+  }
+  /* subtitle：双行字幕 */
+  .ly-sub { flex-direction: column; justify-content: center; gap: 1px; padding: 0 18px; }
+  .ly-sub .sub-jp {
+    font-size: 12px; color: rgba(232,234,240,0.62);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    width: 100%; text-align: center;
+  }
+  .ly-sub .sub-zh {
+    font-size: 15px; font-weight: 600; color: #e8eaf0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    width: 100%; text-align: center;
+  }
+  /* activity：图标圆 + title/sub 或音量条 */
+  .ly-act { padding: 0 10px; gap: 10px; }
+  .ly-act .circle {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: #fff;
+    background: #12b7f5;
+  }
+  .ly-act .act-row {
+    display: flex; align-items: center; gap: 10px;
+    flex: 1; min-width: 0;
+  }
+  .ly-act .act-title {
+    font-size: 13px; font-weight: 600; white-space: nowrap;
+    color: #e8eaf0;
+  }
+  .ly-act .act-sub {
+    font-size: 12px; color: rgba(232,234,240,0.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .ly-act .volbox { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+  .ly-act .track {
+    flex: 1; height: 6px; border-radius: 3px;
+    background: rgba(255,255,255,0.12);
+    overflow: hidden;
+  }
+  .ly-act .fill { height: 100%; width: 0; border-radius: 3px; background: #e8eaf0; }
+  .ly-act .volval {
+    font-size: 12.5px; font-weight: 600; width: 40px; text-align: right;
+    color: #e8eaf0; font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- 控制面板 ---------- */
+  .panel { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .grp { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .grp .lbl {
+    font-size: 0.78rem; color: rgba(232,234,240,0.55);
+    min-width: 64px; text-align: right;
+  }
+  button {
+    font: inherit; font-size: 0.84rem;
+    color: #e8eaf0;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  button:hover { background: rgba(79,140,255,0.18); border-color: rgba(79,140,255,0.5); }
+  button.on { background: rgba(79,140,255,0.3); border-color: #4f8cff; color: #fff; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  label.chk {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.8rem; color: rgba(232,234,240,0.7);
+    cursor: pointer; user-select: none;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    border-radius: 999px;
+    padding: 5px 12px;
+  }
+  label.chk input { accent-color: #4f8cff; cursor: pointer; }
+  .hint {
+    font-size: 0.76rem; color: rgba(232,234,240,0.45);
+    text-align: center; max-width: 640px; line-height: 1.7;
+  }
+
+  /* ---------- 说明 ---------- */
+  section.notes { max-width: 960px; width: 100%; margin-top: 28px; }
+  section.notes h2 {
+    font-size: 1rem; font-weight: 600; color: #4f8cff;
+    margin: 22px 0 10px;
+  }
+  section.notes ul { list-style: none; }
+  section.notes li {
+    font-size: 0.88rem; line-height: 1.8;
+    color: rgba(232,234,240,0.78);
+    padding-left: 18px;
+    position: relative;
+    margin-bottom: 6px;
+  }
+  section.notes li::before {
+    content: "▸";
+    position: absolute; left: 0;
+    color: #4f8cff;
+  }
+  section.notes li code {
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 0.82rem;
+    color: rgba(232,234,240,0.92);
+    background: rgba(255,255,255,0.07);
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <a href="../index.html" class="back">← 画廊</a>
+  <h1>📶 收起态内容优先级仲裁</h1>
+  <div class="src">
+    <code>wisland/ui/compact.py:4</code> 优先级注释 · <code>:387 mode()</code> 三层裁决 · <code>:407 size_hint()</code> 尺寸表 · <code>:430 paint()</code>（<code>:434</code> ease_out 0.28s 淡入）<br>
+    <code>wisland/ui/compact.py:318 set_lyrics()</code>（<code>:325</code> 歌词按整首定宽）· <code>:419</code> 字幕固定宽度 · <code>:357 sub_active()</code>（<code>:22</code> SUB_HOLD_S=7.0）<br>
+    <code>wisland/ui/compact.py:363 show_activity()</code> · <code>:369 update_activity()</code> 原地续期 · <code>wisland/ui/island.py:239</code> 尺寸弹簧 Spring(300, 0.62, 0.2)<br>
+    <code>wisland/app.py:211 on_media()</code> 媒体自动切换 · <code>wisland/app.py:185</code> back_timer(8000ms) · <code>:203 back_to_view()</code> · <code>:57</code> 翻译时长 min(12, 3.5+len×0.12)
+  </div>
+</header>
+
+<div id="stage">
+  <!-- 优先级阶梯：当前获胜的 mode 高亮 -->
+  <div class="ladder" id="ladder">
+    <span class="chip" data-m="activity">🔔 临时活动</span>
+    <span class="sep">›</span>
+    <span class="chip" data-m="subtitle">🔤 实时字幕</span>
+    <span class="sep">›</span>
+    <span class="chip" data-m="media">🎵 正在播放</span>
+    <span class="sep">›</span>
+    <span class="chip" data-m="pet">👀 小形象</span>
+    <span class="sep">›</span>
+    <span class="chip" data-m="idle">🕐 时间/天气</span>
+  </div>
+
+  <!-- 实时读数 -->
+  <div class="hud">
+    <div><span class="k">mode()</span> = <b id="hudMode">idle</b> &nbsp;·&nbsp; <span class="k">size_hint()</span> = <b id="hudSize">214×34</b> &nbsp;·&nbsp; <span class="k">弹簧</span> <b id="hudSpring">214.0 × 34.0</b></div>
+    <div id="hudNote">视图 clock · 未读 3 类</div>
+  </div>
+
+  <!-- 胶囊 -->
+  <div class="capsule" id="capsule">
+    <!-- activity -->
+    <div class="layer ly-act" id="L-activity">
+      <div class="circle" id="actCircle">💬</div>
+      <div class="act-row" id="actRow">
+        <span class="act-title" id="actTitle">新消息</span>
+        <span class="act-sub" id="actSub"></span>
+      </div>
+      <div class="volbox" id="volBox" style="display:none">
+        <div class="track"><div class="fill" id="volFill"></div></div>
+        <div class="volval" id="volVal">60</div>
+      </div>
+    </div>
+    <!-- subtitle -->
+    <div class="layer ly-sub" id="L-subtitle">
+      <div class="sub-jp" id="subJp"></div>
+      <div class="sub-zh" id="subZh"></div>
+    </div>
+    <!-- media -->
+    <div class="layer ly-media" id="L-media">
+      <div class="cover">♪</div>
+      <div class="mtext" id="mediaTxt"></div>
+      <div class="play" id="playGlyph">▶</div>
+    </div>
+    <!-- pet -->
+    <div class="layer ly-pet" id="L-pet">
+      <div class="face">
+        <div class="eye l"></div>
+        <div class="eye r"></div>
+        <div class="mouth"></div>
+      </div>
+    </div>
+    <!-- idle -->
+    <div class="layer ly-idle" id="L-idle">
+      <span class="clock" id="clockTxt">00:00</span>
+      <span class="right">
+        <span class="wx" id="wxTxt">⛅ 18°</span>
+        <span class="dots" id="dotsBox"></span>
+      </span>
+    </div>
+  </div>
+
+  <!-- 控制 -->
+  <div class="panel">
+    <div class="grp">
+      <span class="lbl">触发状态</span>
+      <button id="btnMsg">🔔 消息活动</button>
+      <button id="btnVol">🔊 音量活动</button>
+      <button id="btnSpeak">🗣 开始说话</button>
+      <button id="btnHold">⏸ 停住句子</button>
+      <button id="btnSubOff">❌ 关闭字幕</button>
+    </div>
+    <div class="grp">
+      <span class="lbl">媒体自动切换</span>
+      <button id="btnPlay">▶ 播放</button>
+      <label class="chk"><input type="checkbox" id="ckAuto" checked> media.auto_show</label>
+      <label class="chk"><input type="checkbox" id="ckBadge" checked> 未读圆点</label>
+      <label class="chk"><input type="checkbox" id="ckWx" checked> 天气</label>
+    </div>
+    <div class="grp">
+      <span class="lbl">视图（滚轮切换）</span>
+      <button data-view="clock" class="viewbtn on">🕐 时钟</button>
+      <button data-view="pet" class="viewbtn">👀 小形象</button>
+      <button data-view="music" class="viewbtn">🎵 音乐</button>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+</div>
+
+<section class="notes">
+  <h2>为什么值得借鉴</h2>
+  <ul>
+    <li>一个胶囊、一套裁决：<b>临时活动 &gt; 实时字幕 &gt; 正在播放 &gt; 小形象/时间</b>（<code>compact.py:4</code>）。所有内容来源竞争同一块屏幕时有明确胜负，永不叠罗汉、永不互相遮挡。</li>
+    <li>尺寸随模式用阻尼弹簧收敛（<code>island.py:239</code>，k=300、ratio=0.62），"胶囊变大了"本身就是换台提示，比瞬变更可感、也不生硬。</li>
+    <li>固定宽度防抖：字幕说话时宽度恒定 640+12×未读（<code>compact.py:419</code> 注释「固定宽度：说话时不会一直伸缩」），胶囊不会随语流左右抽搐。</li>
+    <li>歌词宽度按<b>整首最长一句</b>一次定死（<code>compact.py:325</code> 注释「宽度按整首最长一句固定，不随每句变化」），换行只动内容、不动边框。</li>
+    <li>字幕"霸屏但知进退"：最后一句之后只保留 7 秒（<code>compact.py:22</code> SUB_HOLD_S），安静了自动让位给原视图，不永久占屏。</li>
+    <li>媒体自动切换是"借屏"：播放时记住原视图再切到音乐，暂停 8 秒后回切（<code>app.py:185/211</code>），用户自己的布局永远回得去。</li>
+  </ul>
+
+  <h2>实现要点</h2>
+  <ul>
+    <li><code>mode()</code>（<code>compact.py:387</code>）三层裁决：activity 未过期 → activity；否则 <code>sub_active()</code>（sub_on 且有文本且距最后一次 <code>set_sub</code> 不到 7s，<code>:357</code>）→ subtitle 并清空 activity；否则按 view 映射 music→media、pet→pet、其余→idle。</li>
+    <li><code>size_hint()</code>（<code>compact.py:407-427</code>）：idle 150×34（有天气 +64、每个未读 +14）；pet 150+14nb×34；media <code>max(300, 歌词宽)+34+12nb</code> ×36；subtitle 640+12nb ×60；activity 音量/亮度固定 280×40，其余 <code>clamp(70+标题宽+副文宽+24, 220, 460)</code>×40。</li>
+    <li>模式切换：mode 变化时记 <code>_mode_t</code>，<code>paint()</code> 用 <code>ease_out((t-_mode_t)/0.28)</code> 淡入新内容（<code>compact.py:430/434</code>）；尺寸由 <code>Spring(k=300, ratio=0.62, eps=0.2)</code> 收敛（<code>island.py:239</code>）。</li>
+    <li>两处定宽防抖：字幕恒 640+12nb（<code>:419</code>）；歌词在 <code>set_lyrics()</code> 时量整首最长一句 +160、clamp 到 [640,760] 算一次（<code>:325</code>），本页播放时才套用。</li>
+    <li>媒体自动切换（<code>app.py:211 on_media()</code>）：playing 上升沿或 key 变化 → 停定时器、若 view ∈ {clock, pet} 则记 prev_view 并 <code>set_view("music")</code>；暂停沿启动 8s 单发 QTimer（<code>:185</code>）；到点 <code>back_to_view()</code> 仍未播放且还在 music 才回切（<code>:203</code>）。</li>
+    <li>连续同类型活动用 <code>update_activity()</code> 原地更新、只续 until 不重置 start（<code>:369</code>），音量连调不重新入场、时长 1.8s（<code>app.py:247-249</code>）。</li>
+  </ul>
+</section>
+
+<script>
+'use strict';
+/* ============ 移植 wisland/ui/anim.py ============ */
+const clamp = (x, lo, hi) => x < lo ? lo : x > hi ? hi : x;
+const ease_out = t => { t = clamp(t, 0, 1); return 1 - (1 - t) ** 3; };
+class Spring {
+  constructor(v = 0, k = 300, ratio = 0.8, eps = 0.05) {
+    this.x = v; this.v = 0; this.target = v;
+    this.k = k; this.c = 2 * ratio * Math.sqrt(k); this.eps = eps;
+  }
+  to(t) { this.target = t; }
+  step(dt) {
+    if (Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8) {
+      this.x = this.target; this.v = 0; return;
+    }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h; this.x += this.v * h;
+    }
+  }
+}
+
+/* ============ 常量（compact.py:18-23） ============ */
+const H_IDLE = 34, H_MEDIA = 36, H_ACT = 40, H_SUB = 60;
+const SUB_HOLD_S = 7.0, W_TEXT = 640;
+const FONT = '"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+const KIND_COLORS = { qq: '#12b7f5', wechat: '#07c160', mail: '#ff9f0a' }; // theme.py:265
+
+/* ============ 状态 ============ */
+const S = {
+  view: 'clock', prevView: null,          // 收起态视图（cycle_view）
+  activity: null,                          // {type,glyph,color,title,sub,value,muted,start,until}
+  subOn: false, subJp: '', subZh: '', subT: -100,
+  media: { title: '夜に駆ける', artist: 'YOASOBI', playing: false },
+  badges: { qq: 3, wechat: 2, mail: 1 },
+  badgesOn: true, weather: true, autoShow: true,
+  wasPlaying: false, key: null, backAt: 0,  // app.py:184 media_st + back_timer
+  mode: 'idle', prevMode: null, modeT: 0,
+  vol: 0.55,
+  lyrIdx: 0, lyrW: 640, lyrT: 0,
+};
+const LYRICS = [
+  'あの夜の星に願いを込めて君の名前をそっと呼びかけた',
+  '静かな夜に浮かぶ星たちのささやきを聴きながら歩き続ける',
+  '長い夢の続きのように時が止まったような気がしたあの瞬間',
+  '誰も知らない場所で君が待っていると信じて走り続けた旅路の果てに出会った景色をいつかまた一緒に見られたらと願う',
+];
+const SENTENCES = [
+  ['こんにちは、今日はいい天気ですね', '你好，今天天气真不错'],
+  ['明日の会議は十時に始まります', '明天的会议十点开始'],
+  ['この曲はとても人気があります', '这首歌最近非常受欢迎'],
+];
+
+/* ============ 工具 ============ */
+const mctx = document.createElement('canvas').getContext('2d');
+const measure = (txt, font) => { mctx.font = font; return mctx.measureText(txt || '').width; };
+const F_TITLE = '600 13px ' + FONT, F_SUB = '400 12px ' + FONT, F_LYR = '500 13px ' + FONT;
+const $ = id => document.getElementById(id);
+
+/* ============ mode()：compact.py:387 三层裁决 ============ */
+function subActive(now) {
+  return S.subOn && !!(S.subJp || S.subZh) && now - S.subT < SUB_HOLD_S;
+}
+function computeMode(now) {
+  let m;
+  if (S.activity && now < S.activity.until) {
+    m = 'activity';
+  } else if (subActive(now)) {
+    S.activity = null;                    // 字幕胜出时清掉已过期的 activity
+    m = 'subtitle';
+  } else {
+    S.activity = null;
+    m = S.view === 'music' ? 'media' : S.view === 'pet' ? 'pet' : 'idle';
+  }
+  if (m !== S.mode) { S.prevMode = S.mode; S.mode = m; S.modeT = now; }
+  return m;
+}
+
+/* ============ size_hint()：compact.py:407 ============ */
+function nb() {
+  if (!S.badgesOn) return 0;
+  return Object.values(S.badges).filter(v => v > 0).length;
+}
+function sizeHint(m) {
+  const n = nb();
+  if (m === 'activity') {
+    const a = S.activity || {};
+    if (a.type === 'volume') return { w: 280, h: H_ACT };              // :414
+    const w = 70 + measure(a.title, F_TITLE) + measure(a.sub, F_SUB);  // :416
+    return { w: clamp(w + 24, 220, 460), h: H_ACT };                   // :417
+  }
+  if (m === 'subtitle') return { w: W_TEXT + n * 12, h: H_SUB };       // :419 固定宽度
+  if (m === 'media') {
+    if (!S.media.playing && !S.media.title) return { w: 190 + n * 12, h: H_MEDIA };
+    return { w: Math.max(300, S.lyrW) + 34 + n * 12, h: H_MEDIA };     // :423
+  }
+  if (m === 'pet') return { w: 150 + n * 14, h: H_IDLE };              // :425
+  return { w: 150 + (S.weather ? 64 : 0) + n * 14, h: H_IDLE };        // :427
+}
+
+/* ============ 媒体自动切换：app.py:211 on_media() ============ */
+function onMedia(now) {
+  const playing = !!(S.media.playing && S.media.title);
+  const key = S.media.title;
+  if (S.autoShow) {
+    if (playing && (!S.wasPlaying || key !== S.key)) {
+      S.backAt = 0;                                                   // back_timer.stop()
+      if (S.view === 'clock' || S.view === 'pet') {
+        S.prevView = S.view;                                          // 记住原视图
+        S.view = 'music';                                             // 借屏
+      }
+    } else if (!playing && S.wasPlaying && S.prevView) {
+      S.backAt = now + 8;                                             // app.py:185 8000ms
+    }
+  }
+  S.wasPlaying = playing; S.key = key;
+  syncViewBtns();
+}
+function backToView() {                                                // app.py:203
+  if (!S.media.playing && S.prevView && S.view === 'music') S.view = S.prevView;
+  S.prevView = null; S.backAt = 0;
+  syncViewBtns();
+}
+
+/* ============ DOM ============ */
+const capsule = $('capsule');
+const layers = {
+  activity: $('L-activity'), subtitle: $('L-subtitle'),
+  media: $('L-media'), pet: $('L-pet'), idle: $('L-idle'),
+};
+const sw = new Spring(150, 300, 0.62, 0.2);   // island.py:239
+const sh = new Spring(34, 300, 0.62, 0.2);
+
+/* 未读圆点（compact.py:531 _badges） */
+function renderDots() {
+  const box = $('dotsBox');
+  box.innerHTML = '';
+  if (!S.badgesOn) return;
+  for (const k of ['mail', 'wechat', 'qq']) {
+    if (!S.badges[k]) continue;
+    const i = document.createElement('i');
+    i.style.background = KIND_COLORS[k];
+    box.appendChild(i);
+  }
+}
+
+/* 歌词定宽：compact.py:318 set_lyrics() —— 整首最长一句 +160，clamp [640,760]，一次算死 */
+function setLyrics(lines) {
+  let widest = 0;
+  for (const l of lines) widest = Math.max(widest, measure(l, F_LYR));
+  S.lyrW = clamp(widest + 160, W_TEXT, 760);                          // :325
+}
+
+/* ============ 控制 ============ */
+let speakTimer = 0, sentIdx = 0;
+function setSub(jp, zh, now) {                                         // compact.py:350
+  if (jp != null) S.subJp = jp;
+  if (zh != null) S.subZh = zh;
+  S.subT = now;
+}
+function setSubRunning(on) {                                           // :344
+  if (!on) { S.subOn = false; S.subJp = S.subZh = ''; S.subT = -100; }
+  else S.subOn = true;
+}
+
+$('btnSpeak').onclick = () => {
+  const now = perfNow();
+  if (speakTimer) return;
+  setSubRunning(true);
+  sentIdx = (sentIdx + 1) % SENTENCES.length;
+  setSub(SENTENCES[sentIdx][0], SENTENCES[sentIdx][1], now);           // 原文先到、译文后到（同帧）
+  speakTimer = setInterval(() => {
+    sentIdx = (sentIdx + 1) % SENTENCES.length;
+    setSub(SENTENCES[sentIdx][0], SENTENCES[sentIdx][1], perfNow());
+  }, 2400);
+  syncBtns();
+};
+$('btnHold').onclick = () => {                                         // 停住句子：sub_on 保持，7s 后回切
+  if (speakTimer) { clearInterval(speakTimer); speakTimer = 0; }
+  syncBtns();
+};
+$('btnSubOff').onclick = () => {                                       // set_sub_running(False)
+  if (speakTimer) { clearInterval(speakTimer); speakTimer = 0; }
+  setSubRunning(false);
+  syncBtns();
+};
+
+$('btnMsg').onclick = () => {                                          // show_activity()
+  const now = perfNow();
+  S.activity = {
+    type: 'message', glyph: '💬', color: KIND_COLORS.qq,
+    title: '新消息', sub: '[QQ] 明天的会几点开始？',
+    start: now, until: now + 4,                                        // show_activity 默认 2.4s，演示用 4s
+  };
+};
+$('btnVol').onclick = () => {
+  const now = perfNow();
+  S.vol = S.vol >= 0.95 ? 0.3 : Math.min(1, S.vol + 0.22);
+  if (S.activity && S.activity.type === 'volume' && now < S.activity.until) {
+    // update_activity()（compact.py:369）：原地更新、只续 until，start 不变 → 不重新入场
+    Object.assign(S.activity, { value: S.vol, muted: false, until: now + 1.8 });
+  } else {
+    S.activity = { type: 'volume', glyph: '🔊', value: S.vol, muted: false, start: now, until: now + 1.8 };
+  }
+};
+
+$('btnPlay').onclick = () => {
+  S.media.playing = !S.media.playing;
+  onMedia(perfNow());
+  syncBtns();
+};
+$('ckAuto').onchange = e => { S.autoShow = e.target.checked; };         // media.auto_show
+$('ckBadge').onchange = e => { S.badgesOn = e.target.checked; renderDots(); };
+$('ckWx').onchange = e => { S.weather = e.target.checked; };
+
+document.querySelectorAll('.viewbtn').forEach(b => {
+  b.onclick = () => {                                                  // set_view()
+    S.view = b.dataset.view;
+    syncViewBtns();
+  };
+});
+
+function syncViewBtns() {
+  document.querySelectorAll('.viewbtn').forEach(b =>
+    b.classList.toggle('on', b.dataset.view === S.view));
+}
+function syncBtns() {
+  $('btnSpeak').classList.toggle('on', !!speakTimer);
+  $('btnHold').classList.toggle('on', S.subOn && !speakTimer);
+  $('btnPlay').textContent = S.media.playing ? '⏸ 暂停' : '▶ 播放';
+  $('btnPlay').classList.toggle('on', S.media.playing);
+}
+
+/* ============ 渲染 ============ */
+const perfNow = () => performance.now() / 1000;
+let lastT = perfNow(), lastSec = -1, lastLyricSec = -1;
+
+function renderActivity(now) {
+  const a = S.activity || {};
+  const isVol = a.type === 'volume';
+  $('volBox').style.display = isVol ? 'flex' : 'none';
+  $('actRow').style.display = isVol ? 'none' : 'flex';
+  $('actCircle').style.background = isVol ? '#4f8cff' : (a.color || '#12b7f5');
+  $('actCircle').textContent = isVol ? '🔊' : (a.glyph || '💬');
+  if (isVol) {
+    // 入场 0.35s ease_out（compact.py:664 enter）：音量条从 0 长出；续期时 start 不变 → 不重播
+    const ek = ease_out((now - a.start) / 0.35);
+    const track = $('volFill').parentElement;
+    const bw = track.offsetWidth || 1;
+    const v = clamp(a.value ?? 0, 0, 1);
+    $('volFill').style.width = Math.max(6, bw * v * ek) + 'px';
+    $('volVal').textContent = a.muted ? '静音' : Math.round(v * 100);
+    $('actRow').style.opacity = 1;
+    $('actCircle').style.transform = 'scale(1)';
+  } else {
+    $('actTitle').textContent = a.title || '';
+    $('actSub').textContent = a.sub || '';
+    // 图标圆 + title/sub 的 0.35s ease_out 入场
+    const ek = ease_out((now - (a.start ?? now)) / 0.35);
+    $('actCircle').style.transform = 'scale(' + (0.6 + 0.4 * ek) + ')';
+    $('actRow').style.opacity = ek;
+    $('actRow').style.transform = 'translateX(' + (6 * (1 - ek)) + 'px)';
+  }
+}
+
+function renderMedia(now) {
+  // 播放中按 4s 推进歌词行（行切换动画见 lyric-transition.html，这里只换文本）
+  if (S.media.playing) {
+    const sec = Math.floor(now);
+    if (sec !== lastLyricSec && sec % 4 === 0 && S.lyrIdx < LYRICS.length - 1) {
+      S.lyrIdx++;
+    }
+    lastLyricSec = sec;
+  }
+  $('mediaTxt').textContent = LYRICS[S.lyrIdx] || (S.media.title + '  ·  ' + S.media.artist);
+  $('playGlyph').textContent = S.media.playing ? '⏸' : '▶';
+}
+
+function renderHud(now, target) {
+  $('hudMode').textContent = S.mode;
+  $('hudSize').textContent = Math.round(target.w) + '×' + Math.round(target.h);
+  $('hudSpring').textContent = sw.x.toFixed(1) + ' × ' + sh.x.toFixed(1);
+  const notes = [];
+  notes.push('视图 ' + S.view + (S.prevView ? '（已记住原视图 ' + S.prevView + '）' : ''));
+  notes.push('未读 ' + nb() + ' 类');
+  if (S.mode === 'subtitle' || subActive(now)) {
+    notes.push('字幕保持剩余 <b>' + Math.max(0, SUB_HOLD_S - (now - S.subT)).toFixed(1) + 's</b>，安静 7s 回切');
+    notes.push('宽度恒 <b>' + (W_TEXT + nb() * 12) + 'px</b>（说话不伸缩）');
+  }
+  if (S.mode === 'media') {
+    notes.push('歌词定宽 <b>' + Math.round(S.lyrW) + '</b> = clamp(整首最长句+160, 640, 760)');
+  }
+  if (S.activity && now < S.activity.until) {
+    notes.push('活动剩余 <b>' + (S.activity.until - now).toFixed(1) + 's</b>' +
+      (S.activity.type === 'volume' ? '（连点音量：update_activity 续期不重入）' : ''));
+  }
+  if (S.backAt > now) {
+    notes.push('暂停回切倒计时 <b>' + (S.backAt - now).toFixed(1) + 's</b>（8s 后回 ' + S.prevView + '）');
+  }
+  $('hudNote').innerHTML = notes.join(' · ');
+}
+
+function frame() {
+  const now = perfNow();
+  const dt = clamp(now - lastT, 0.001, 0.05);
+  lastT = now;
+
+  const m = computeMode(now);
+  const target = sizeHint(m);
+  sw.to(target.w); sh.to(target.h);
+  sw.step(dt); sh.step(dt);
+  capsule.style.width = sw.x.toFixed(2) + 'px';
+  capsule.style.height = sh.x.toFixed(2) + 'px';
+
+  // mode 切换 0.28s ease_out 交叉淡入（compact.py:434）
+  const k = ease_out((now - S.modeT) / 0.28);
+  for (const key in layers) {
+    const el = layers[key];
+    if (key === m) el.style.opacity = k;
+    else if (key === S.prevMode) el.style.opacity = 1 - k;
+    else el.style.opacity = 0;
+  }
+
+  // 定时器
+  if (S.backAt && now >= S.backAt) backToView();                        // back_timer 到点
+
+  // 每秒更新的轻量内容
+  const sec = Math.floor(now);
+  if (sec !== lastSec) {
+    lastSec = sec;
+    const d = new Date();
+    $('clockTxt').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  if (m === 'activity') renderActivity(now);
+  if (m === 'media') renderMedia(now);
+  renderHud(now, target);
+
+  // 阶梯高亮
+  document.querySelectorAll('.ladder .chip').forEach(c =>
+    c.classList.toggle('on', c.dataset.m === m));
+
+  requestAnimationFrame(frame);
+}
+
+/* ============ 初始化 ============ */
+setLyrics(LYRICS);
+renderDots();
+syncBtns();
+syncViewBtns();
+$('hint').textContent = '试试：先「开始说话」再点「消息活动」——活动压过字幕；活动到期后字幕自动接回。' +
+  '点「播放」胶囊自动切到音乐视图并记住原视图，暂停 8 秒后回切；连点「音量活动」观察 update_activity 原地续期。';
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

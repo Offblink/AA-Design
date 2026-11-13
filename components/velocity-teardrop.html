@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>💧 速度泪滴 · AA-Design</title>
+<style>
+  :root {
+    --accent: #4f8cff;
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 20px 48px;
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans", "MiSans", "Segoe UI Variable Text", "Microsoft YaHei UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    max-width: 860px;
+    margin: 28px auto 4px;
+  }
+  .back {
+    display: inline-block;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: background 0.15s;
+  }
+  .back:hover { background: rgba(79, 140, 255, 0.18); }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 16px 0 6px;
+  }
+  .src {
+    font-size: 0.8rem;
+    color: rgba(232, 234, 240, 0.55);
+    font-family: Consolas, "Cascadia Mono", monospace;
+    word-break: break-all;
+  }
+  #stage {
+    position: relative;
+    max-width: 860px;
+    height: 460px;
+    margin: 20px auto 0;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #0c0c14;
+    border: 1px solid var(--glass-border);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #cv {
+    position: absolute;
+    inset: 0;
+    display: block;
+    cursor: grab;
+  }
+  #cv.dragging { cursor: grabbing; }
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+  }
+  #hud {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    padding: 12px 14px;
+    min-width: 218px;
+    font-size: 0.8rem;
+    pointer-events: none;
+  }
+  .hud-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    line-height: 1.9;
+    color: rgba(232, 234, 240, 0.55);
+  }
+  .hud-row .v {
+    color: #e8eaf0;
+    font-variant-numeric: tabular-nums;
+    font-family: Consolas, "Cascadia Mono", monospace;
+  }
+  .hud-row .v b { font-weight: 600; color: var(--accent); }
+  .bar {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin: 2px 0 8px;
+  }
+  .bar i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #4f8cff, #7fb2ff);
+    transition: width 0.05s linear;
+  }
+  #hint {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    font-size: 0.78rem;
+    color: rgba(232, 234, 240, 0.55);
+    background: var(--glass);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    pointer-events: none;
+  }
+  #ctrls {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+  }
+  #ctrls button {
+    font: inherit;
+    font-size: 0.85rem;
+    color: #e8eaf0;
+    background: var(--glass);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #ctrls button:hover {
+    background: rgba(79, 140, 255, 0.18);
+    border-color: rgba(79, 140, 255, 0.5);
+  }
+  section.notes {
+    max-width: 860px;
+    margin: 26px auto 0;
+  }
+  section.notes h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 22px 0 8px;
+  }
+  section.notes ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  section.notes li {
+    font-size: 0.9rem;
+    line-height: 1.75;
+    color: rgba(232, 234, 240, 0.82);
+    margin-bottom: 6px;
+  }
+  section.notes code {
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 0.84em;
+    color: #7fb2ff;
+    background: rgba(79, 140, 255, 0.12);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="../index.html">← 画廊</a>
+  <h1>💧 速度泪滴 —— 拖得越快，形状越像被甩出去的水滴</h1>
+  <div class="src">wisland/ui/shape.py:108 deform() · wisland/ui/island.py:710 _update_geometry() · wisland/ui/anim.py:32 Spring.step()</div>
+</header>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud" class="glass">
+    <div class="hud-row"><span>速度 speed</span><span class="v"><b id="m-speed">0</b> px/s</span></div>
+    <div class="bar"><i id="b-speed"></i></div>
+    <div class="hud-row"><span>形变量 amt</span><span class="v"><b id="m-amt">0.00</b></span></div>
+    <div class="bar"><i id="b-amt"></i></div>
+    <div class="hud-row"><span>后缘收窄</span><span class="v"><b id="m-sq">0.0</b> %</span></div>
+    <div class="hud-row"><span>拖尾 push</span><span class="v"><b id="m-lag">0.0</b> px</span></div>
+    <div class="hud-row"><span>前缘鼓起</span><span class="v"><b id="m-bulge">0.0</b> px</span></div>
+    <div class="hud-row"><span>状态</span><span class="v" id="m-state">静止</span></div>
+  </div>
+  <div id="hint">按住舞台任意处拖动 · 松手弹簧回正</div>
+  <div id="ctrls">
+    <button id="fling" type="button">🚀 甩一下</button>
+    <button id="recenter" type="button">🎯 回中</button>
+  </div>
+</div>
+
+<section class="notes">
+  <h2>为什么值得借鉴</h2>
+  <ul>
+    <li><strong>形变本身就是速度反馈</strong>：拖拽时"往哪甩、甩多快"直接写在轮廓上——后缘拖多长、前缘鼓多少，用户不看任何数字就能感知运动状态，比光标样式或 toast 提示更前置、零认知成本。</li>
+    <li><strong>只在 speed &gt; 30 px/s 才启用形变采样</strong>（island.py:784）：低速微调保持刚性几何，手抖不会被放大成"果冻感"；高速才有花活，安静时绝不打扰。</li>
+    <li><strong>非对称形变制造液体惯性错觉</strong>：后缘收窄 38%、整段拖尾 lag，前缘却只鼓 0.12·lag——前轻后重，像一颗有质量的水滴被甩出去，而不是刚体在平移。</li>
+    <li><strong>回正来自物理而非补间</strong>：速度取自阻尼弹簧的 v，松手后速度自然衰减且带一点余摆（ratio 0.78 &lt; 1 欠阻尼），形状"活"过来的代价只有一次积分，不需要额外关键帧。</li>
+    <li><strong>形变是纯叠加层</strong>：deform 只改顶点、不改语义，同一份轮廓管线还能继续叠按压凹陷、播放波动 wave——一套顶点流服务多种效果，扩展不重写。</li>
+  </ul>
+
+  <h2>实现要点</h2>
+  <ul>
+    <li>速度不是鼠标速度，而是<strong>位置弹簧的速度</strong>：<code>vx, vy = fx.v, fy.v</code>（island.py:710），<code>fx/fy = Spring(0, 900, 0.78, 0.2)</code>（island.py:241-242）——弹簧既平滑输入，又天然产生甩尾的速度峰值与松手余摆。</li>
+    <li><code>amt = clamp(hypot(vx,vy) / 2600, 0, 1)</code>（shape.py:112）：2600 px/s 满形变封顶；<code>lag = halfExtent · 0.6 · amt</code>（shape.py:119），<code>halfExtent = min(w,h)/2 + 12</code>（island.py:818）。</li>
+    <li>逐点 <code>s = n·d</code> 判前后缘（shape.py:126，1=前缘 −1=后缘），<code>tf = (1−s)/2</code> 归一；<code>squeeze = 1 − 0.38·amt·tf^1.2</code>（shape.py:130）只收窄后缘；<code>push = −lag·tf^1.6 + lag·0.12·(1−tf)^2</code>（shape.py:131）后缘拖尾、前缘微鼓。</li>
+    <li>轮廓先 <code>body_points</code> 按 <strong>step=4.0</strong> 均匀采样成多边形（shape.py:75，island.py:785），形变后 <code>poly_path</code> 用 Catmull-Rom 转贝塞尔闭合（shape.py:142），泪滴边缘依旧光滑、无多边形棱角。</li>
+    <li>弹簧积分 <code>c = 2·ratio·√k</code>（anim.py:16），每帧拆成 ≤ 1/240 s 的子步（anim.py:37），帧率波动不改变回正轨迹；帧间隔本身夹在 [1/240, 1/30]（island.py:556）。</li>
+    <li>HUD 与渲染同源：收窄 <code>38·amt%</code>、拖尾 <code>lag px</code>、鼓起 <code>0.12·lag px</code> 都由同一份 amt 直接代入公式，所见即所算。</li>
+  </ul>
+</section>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- 常量（与 wisland 一致） ----------
+  const K_POS = 900, RATIO_POS = 0.78, EPS_POS = 0.2; // island.py:241 fx/fy Spring(0, 900, 0.78, 0.2)
+  const SPEED_CAP = 2600;                             // shape.py:112 amt = speed / 2600
+  const SPEED_GATE = 30;                              // island.py:784 if speed > 30
+  const STEP = 4.0;                                   // island.py:785 body_points(..., 4.0)
+  const CAP_W = 176, CAP_H = 64, CAP_R = 32;
+
+  const clamp = (x, lo, hi) => x < lo ? lo : x > hi ? hi : x;
+
+  // ---------- 弹簧：照抄 anim.py Spring（c = 2·ratio·√k，240Hz 子步进） ----------
+  class Spring {
+    constructor(x, k, ratio, eps) {
+      this.x = x; this.v = 0; this.target = x;
+      this.k = k;
+      this.c = 2 * ratio * Math.sqrt(k);   // anim.py:16
+      this.eps = eps;
+    }
+    step(dt) {
+      if (Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8) {
+        this.x = this.target; this.v = 0;  // anim.py:33-36 rest
+        return;
+      }
+      const n = Math.max(1, Math.ceil(dt / (1 / 240))); // anim.py:37
+      const h = dt / n;
+      for (let i = 0; i < n; i++) {
+        const a = -this.k * (this.x - this.target) - this.c * this.v;
+        this.v += a * h;
+        this.x += this.v * h;
+      }
+    }
+  }
+
+  // ---------- body_points：shape.py:75-106 均匀采样圆角矩形 ----------
+  function bodyPoints(x, y, w, h, r, step) {
+    const m = Math.min(w, h) / 2;
+    const tl = clamp(r, 0, m), tr = clamp(r, 0, m), br = clamp(r, 0, m), bl = clamp(r, 0, m);
+    const pts = [];
+    const line = (x0, y0, x1, y1) => {
+      const n = Math.max(1, Math.floor(Math.hypot(x1 - x0, y1 - y0) / step));
+      for (let i = 0; i < n; i++) {
+        const t = i / n;
+        pts.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t]);
+      }
+    };
+    const arc = (cx, cy, rr, a0) => {
+      if (rr <= 0.01) { pts.push([cx, cy]); return; }
+      const n = Math.max(2, Math.floor(rr * Math.PI / 2 / step));
+      for (let i = 0; i < n; i++) {
+        const a = a0 + (Math.PI / 2) * i / n;
+        pts.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a)]);
+      }
+    };
+    line(x + tl, y, x + w - tr, y);
+    arc(x + w - tr, y + tr, tr, -Math.PI / 2);
+    line(x + w, y + tr, x + w, y + h - br);
+    arc(x + w - br, y + h - br, br, 0);
+    line(x + w - br, y + h, x + bl, y + h);
+    arc(x + bl, y + h - bl, bl, Math.PI / 2);
+    line(x, y + h - bl, x, y + tl);
+    arc(x + tl, y + tl, tl, Math.PI);
+    return pts;
+  }
+
+  // ---------- deform：shape.py:108-140 原样移植（wave 略） ----------
+  function deform(pts, cx, cy, vx, vy, halfExtent) {
+    const speed = Math.hypot(vx, vy);
+    const amt = clamp(speed / SPEED_CAP, 0, 1);       // shape.py:112
+    if (amt < 0.004) return pts;                      // shape.py:113
+    const inv = speed > 1e-3 ? 1 / speed : 0;
+    const dx = vx * inv, dy = vy * inv;
+    const lag = halfExtent * 0.6 * amt;               // shape.py:119
+    const out = [];
+    for (let i = 0; i < pts.length; i++) {
+      const rx = pts[i][0] - cx, ry = pts[i][1] - cy;
+      const d = Math.hypot(rx, ry) || 1;
+      const nx = rx / d, ny = ry / d;
+      const s = nx * dx + ny * dy;                    // shape.py:126 1=前缘 -1=后缘
+      const tf = (1 - s) * 0.5;                       // shape.py:127
+      const along = rx * dx + ry * dy;
+      const perpX = rx - along * dx, perpY = ry - along * dy;
+      const squeeze = 1 - 0.38 * amt * Math.pow(tf, 1.2);              // shape.py:130
+      const push = -lag * Math.pow(tf, 1.6) + lag * 0.12 * Math.pow(1 - tf, 2); // shape.py:131
+      out.push([
+        cx + along * dx + perpX * squeeze + dx * push,  // shape.py:132
+        cy + along * dy + perpY * squeeze + dy * push   // shape.py:133
+      ]);
+    }
+    return out;
+  }
+
+  // ---------- poly_path：shape.py:142-159 Catmull-Rom 转贝塞尔 ----------
+  function polyPath(pts) {
+    const p = new Path2D();
+    const n = pts.length;
+    if (n < 3) return p;
+    p.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      p.bezierCurveTo(c1x, c1y, c2x, c2y, p2[0], p2[1]);
+    }
+    p.closePath();
+    return p;
+  }
+
+  function roundRectPath(x, y, w, h, r) {
+    const p = new Path2D();
+    p.moveTo(x + r, y);
+    p.arcTo(x + w, y, x + w, y + h, r);
+    p.arcTo(x + w, y + h, x, y + h, r);
+    p.arcTo(x, y + h, x, y, r);
+    p.arcTo(x, y, x + w, y, r);
+    p.closePath();
+    return p;
+  }
+
+  // ---------- 舞台 ----------
+  const stage = document.getElementById("stage");
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let grid = null;
+
+  const fx = new Spring(0, K_POS, RATIO_POS, EPS_POS);
+  const fy = new Spring(0, K_POS, RATIO_POS, EPS_POS);
+  let inited = false;
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * DPR);
+    cv.height = Math.round(H * DPR);
+    cv.style.width = W + "px";
+    cv.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (!inited) {
+      fx.x = fx.target = W / 2;
+      fy.x = fy.target = H / 2;
+      inited = true;
+    } else {
+      fx.target = clamp(fx.target, CAP_W / 2 + 8, W - CAP_W / 2 - 8);
+      fy.target = clamp(fy.target, CAP_H / 2 + 8, H - CAP_H / 2 - 8);
+    }
+    // 点阵网格缓存
+    grid = document.createElement("canvas");
+    grid.width = cv.width; grid.height = cv.height;
+    const g = grid.getContext("2d");
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.fillStyle = "rgba(255,255,255,0.055)";
+    for (let gx = 13; gx < W; gx += 26) {
+      for (let gy = 13; gy < H; gy += 26) g.fillRect(gx, gy, 1.5, 1.5);
+    }
+  }
+  window.addEventListener("resize", resize);
+
+  // ---------- 交互：拖动 ----------
+  let drag = null;   // { ox, oy } 指针 -> 弹簧目标的偏移
+  let auto = null;   // 甩一下：自动往返
+  const trail = [];  // 轨迹采样
+
+  function pointerPos(e) {
+    const r = cv.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+
+  cv.addEventListener("pointerdown", (e) => {
+    const [px, py] = pointerPos(e);
+    auto = null;
+    drag = { ox: fx.target - px, oy: fy.target - py };
+    fx.target = px + drag.ox;
+    fy.target = py + drag.oy;
+    cv.classList.add("dragging");
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const [px, py] = pointerPos(e);
+    fx.target = clamp(px + drag.ox, CAP_W / 2 + 8, W - CAP_W / 2 - 8);
+    fy.target = clamp(py + drag.oy, CAP_H / 2 + 8, H - CAP_H / 2 - 8);
+  });
+  const release = () => { drag = null; cv.classList.remove("dragging"); };
+  cv.addEventListener("pointerup", release);
+  cv.addEventListener("pointercancel", release);
+
+  // ---------- 交互：按钮 ----------
+  document.getElementById("fling").addEventListener("click", () => {
+    drag = null;
+    auto = { side: -1, n: 6, wait: 0 };
+  });
+  document.getElementById("recenter").addEventListener("click", () => {
+    auto = null;
+    fx.target = W / 2;
+    fy.target = H / 2;
+  });
+
+  // ---------- HUD ----------
+  const el = (id) => document.getElementById(id);
+  const mSpeed = el("m-speed"), mAmt = el("m-amt"), mSq = el("m-sq"),
+        mLag = el("m-lag"), mBulge = el("m-bulge"), mState = el("m-state"),
+        bSpeed = el("b-speed"), bAmt = el("b-amt");
+
+  // ---------- 主循环 ----------
+  let last = performance.now();
+
+  function frame(now) {
+    // island.py:556 dt = min(1/30, max(1/240, ...))
+    const dt = Math.min(1 / 30, Math.max(1 / 240, (now - last) / 1000));
+    last = now;
+
+    // 自动甩动：目标在左右端点间跳跃，弹簧自己甩出速度峰
+    if (auto && !drag) {
+      auto.wait -= dt;
+      if (auto.wait <= 0) {
+        auto.side *= -1;
+        auto.n -= 1;
+        fx.target = W / 2 + auto.side * (W / 2 - CAP_W / 2 - 44);
+        fy.target = H / 2;
+        auto.wait = 0.62;
+        if (auto.n <= 0) {
+          auto = null;
+          fx.target = W / 2;
+          fy.target = H / 2;
+        }
+      }
+    }
+
+    fx.step(dt);
+    fy.step(dt);
+
+    const cx = fx.x, cy = fy.x;
+    const vx = fx.v, vy = fy.v;                 // island.py:710
+    const speed = Math.hypot(vx, vy);
+    const amt = clamp(speed / SPEED_CAP, 0, 1); // shape.py:112
+    const halfExtent = Math.min(CAP_W, CAP_H) / 2 + 12; // island.py:818 → 44
+    const lag = halfExtent * 0.6 * amt;         // shape.py:119
+
+    // 轨迹
+    if (speed > 60) trail.push([cx, cy]);
+    while (trail.length > 26) trail.shift();
+
+    // ---------- 绘制 ----------
+    ctx.clearRect(0, 0, W, H);
+    if (grid) ctx.drawImage(grid, 0, 0, W, H);
+
+    // 残影轨迹
+    if (trail.length > 1) {
+      for (let i = 1; i < trail.length; i++) {
+        const a = (i / trail.length) * 0.28;
+        ctx.strokeStyle = "rgba(79,140,255," + a.toFixed(3) + ")";
+        ctx.lineWidth = 2 + 6 * (i / trail.length);
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(trail[i - 1][0], trail[i - 1][1]);
+        ctx.lineTo(trail[i][0], trail[i][1]);
+        ctx.stroke();
+      }
+    }
+
+    const bx = cx - CAP_W / 2, by = cy - CAP_H / 2;
+
+    // 未形变参考轮廓（虚线）
+    ctx.save();
+    ctx.setLineDash([5, 6]);
+    ctx.strokeStyle = "rgba(232,234,240,0.28)";
+    ctx.lineWidth = 1;
+    ctx.stroke(roundRectPath(bx, by, CAP_W, CAP_H, CAP_R));
+    ctx.restore();
+
+    // 本体：speed > 30 才走多边形形变路径（island.py:784）
+    let path;
+    if (speed > SPEED_GATE) {
+      const pts = deform(bodyPoints(bx, by, CAP_W, CAP_H, CAP_R, STEP),
+                         cx, cy, vx, vy, halfExtent);
+      path = polyPath(pts);
+    } else {
+      path = roundRectPath(bx, by, CAP_W, CAP_H, CAP_R);
+    }
+
+    ctx.save();
+    ctx.shadowColor = "rgba(79,140,255,0.55)";
+    ctx.shadowBlur = 18;
+    const grad = ctx.createLinearGradient(bx, by, bx, by + CAP_H);
+    grad.addColorStop(0, "rgba(130,175,255,0.36)");
+    grad.addColorStop(1, "rgba(79,140,255,0.14)");
+    ctx.fillStyle = grad;
+    ctx.fill(path);
+    ctx.restore();
+
+    ctx.strokeStyle = "rgba(150,190,255,0.9)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke(path);
+
+    // 速度矢量
+    if (speed > 60) {
+      const dx = vx / speed, dy = vy / speed;
+      const len = Math.min(130, speed / 17);
+      const alpha = Math.min(0.9, 0.25 + amt * 0.75);
+      ctx.strokeStyle = "rgba(255,255,255," + alpha.toFixed(3) + ")";
+      ctx.fillStyle = "rgba(255,255,255," + alpha.toFixed(3) + ")";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + dx * len, cy + dy * len);
+      ctx.stroke();
+      const hx = cx + dx * len, hy = cy + dy * len;
+      const px = -dy, py = dx;
+      ctx.beginPath();
+      ctx.moveTo(hx + dx * 8, hy + dy * 8);
+      ctx.lineTo(hx + px * 5, hy + py * 5);
+      ctx.lineTo(hx - px * 5, hy - py * 5);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ---------- HUD（与渲染同一份 amt） ----------
+    mSpeed.textContent = String(Math.round(speed));
+    mAmt.textContent = amt.toFixed(2);
+    mSq.textContent = (38 * amt).toFixed(1);
+    mLag.textContent = lag.toFixed(1);
+    mBulge.textContent = (0.12 * lag).toFixed(1);
+    mState.textContent = drag ? "拖拽中" : auto ? "自动甩动" : speed > SPEED_GATE ? "形变中" : "静止";
+    bSpeed.style.width = (amt * 100).toFixed(1) + "%";
+    bAmt.style.width = (amt * 100).toFixed(1) + "%";
+
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

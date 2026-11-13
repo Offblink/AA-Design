@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>点击时序消歧 · AA-Design</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a10; color:#e8eaf0; min-height:100vh;
+  font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+}
+header { padding:32px 24px 8px; max-width:960px; margin:0 auto; }
+header a { color:rgba(232,234,240,0.55); text-decoration:none; font-size:0.85rem; }
+header a:hover { color:#4f8cff; }
+header h1 { font-size:1.5rem; font-weight:700; margin-top:10px; }
+header .src { font-family:Consolas,monospace; font-size:0.75rem; color:rgba(232,234,240,0.4); margin-top:6px; }
+header .src code { color:#7dd3fc; }
+#stage {
+  position:relative; max-width:960px; margin:18px auto 0; height:480px;
+  border-radius:16px; overflow:hidden;
+  background:linear-gradient(160deg,#12161f 0%,#0d1420 55%,#101826 100%);
+  border:1px solid rgba(255,255,255,0.12);
+}
+.pad { position:absolute; inset:0; }
+.pill {
+  position:absolute; left:50%; top:76px; transform:translateX(-50%);
+  width:260px; height:64px; border-radius:999px;
+  background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
+  backdrop-filter:blur(18px); cursor:grab;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  font-size:0.9rem; user-select:none; touch-action:none;
+  transition:border-color .15s;
+}
+.pill:active { cursor:grabbing; }
+.pill.hot { border-color:#4f8cff; box-shadow:0 0 0 3px rgba(79,140,255,0.18); }
+.pill .dot { width:8px; height:8px; border-radius:50%; background:#34d399; }
+.pill.moved .dot { background:#fb923c; }
+.thresh {
+  position:absolute; left:50%; top:150px; transform:translateX(-50%);
+  font-family:Consolas,monospace; font-size:0.7rem; color:rgba(232,234,240,0.4);
+  pointer-events:none;
+}
+.thresh b { color:#4f8cff; }
+.log {
+  position:absolute; right:14px; top:14px; bottom:14px; width:340px;
+  background:rgba(10,10,16,0.78); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; backdrop-filter:blur(18px); padding:12px 14px;
+  font-family:Consolas,monospace; font-size:0.7rem; line-height:1.7;
+  overflow-y:auto; color:rgba(232,234,240,0.7);
+}
+.log h3 { font-size:0.72rem; color:#4f8cff; margin-bottom:6px; font-weight:600; }
+.log .t { color:rgba(232,234,240,0.35); }
+.log .ev { color:#7dd3fc; }
+.log .go { color:#34d399; }
+.log .warn { color:#fb923c; }
+.log .bad { color:#f87171; }
+.timer {
+  position:absolute; left:14px; top:14px; z-index:2;
+  background:rgba(10,10,16,0.72); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; padding:10px 14px; font-family:Consolas,monospace;
+  font-size:0.72rem; line-height:1.8; color:rgba(232,234,240,0.75);
+  backdrop-filter:blur(18px); min-width:240px;
+}
+.timer b { color:#4f8cff; font-weight:600; }
+.timer .bar { display:inline-block; width:90px; height:6px; border-radius:3px; background:rgba(255,255,255,0.1); vertical-align:middle; margin-left:6px; overflow:hidden; }
+.timer .bar i { display:block; height:100%; background:#4f8cff; width:0; }
+.ctl {
+  position:absolute; bottom:14px; left:14px; z-index:3;
+  display:flex; gap:8px; flex-wrap:wrap; max-width:calc(100% - 380px);
+}
+.ctl button {
+  font:inherit; font-size:0.78rem; padding:7px 14px; border-radius:999px; cursor:pointer;
+  color:#e8eaf0; background:rgba(10,10,16,0.72); border:1px solid rgba(255,255,255,0.12);
+  backdrop-filter:blur(18px); transition:all .2s;
+}
+.ctl button:hover { border-color:#4f8cff; color:#4f8cff; }
+.verdict {
+  position:absolute; left:50%; top:170px; transform:translateX(-50%);
+  font-size:1rem; font-weight:600; pointer-events:none; opacity:0;
+  transition:opacity .2s; background:rgba(10,10,16,0.85);
+  padding:8px 22px; border-radius:999px; border:1px solid rgba(255,255,255,0.14);
+  backdrop-filter:blur(18px); white-space:nowrap;
+}
+.verdict.show { opacity:1; }
+.verdict.ok { color:#34d399; border-color:rgba(52,211,153,0.5); }
+.verdict.no { color:#fb923c; border-color:rgba(251,146,60,0.5); }
+.notes { max-width:960px; margin:24px auto 60px; padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px) { .notes { grid-template-columns:1fr; } .log { display:none; } .ctl { max-width:calc(100% - 28px); } }
+.notes section {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px; padding:20px 22px; backdrop-filter:blur(18px);
+}
+.notes h2 { font-size:1rem; font-weight:600; color:#4f8cff; margin-bottom:12px; }
+.notes li { font-size:0.85rem; line-height:1.75; color:rgba(232,234,240,0.72); margin:8px 0 8px 18px; }
+.notes code { font-family:Consolas,monospace; font-size:0.78rem; color:#7dd3fc; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>👆 点击时序消歧 — 单击 / 双击 / 拖动 / 长按</h1>
+  <div class="src">源出 <code>wisland/ui/island.py:1119 mouseReleaseEvent</code>（doubleClickInterval 定时器）· <code>island.py:1107 mouseMoveEvent</code>（4px 阈值）· <code>nav.py:22 LONG_PRESS_MS=380</code></div>
+</header>
+
+<div id="stage">
+  <div class="pad" id="pad">
+    <div class="pill" id="pill"><span class="dot"></span><span id="pillText">按住我拖动 · 点我 · 双击我</span></div>
+    <div class="thresh">拖动判定阈值：<b>manhattan &gt; 4px</b> · 长按：<b>380ms</b> · 单击定时器：<b>doubleClickInterval</b></div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+  <div class="timer" id="timer"></div>
+  <div class="log" id="log"><h3>事件日志</h3></div>
+  <div class="ctl">
+    <button id="clearBtn">🗑️ 清空日志</button>
+    <button id="slowBtn">🐢 慢放演示（点击后停在定时器里）</button>
+  </div>
+</div>
+
+<div class="notes">
+  <section>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li><b>单击 ≠ 立即动作</b>：release 后起一个 <code>doubleClickInterval</code> 定时器，dblclick 来了就取消它 —— 用「延迟一个窗口期」换到单击/双击共存，不需要用户改设置。</li>
+      <li><b>4px 是拖动与点击的分界</b>：按下只是「候选」，位移超过 4px（曼哈顿距离）才升级成拖动并作废点击 —— 手抖不会误触发。</li>
+      <li>wisland 里这个阈值出现两次（岛本体 <code>island.py:1107</code>、导航栏 <code>nav.py:175</code>），是<b>全项目统一手感</b>的一部分。</li>
+      <li>长按 380ms 进拖动，但<b>按下后一移动就立刻拖</b>（不等 380ms）—— 长按只是「不动」时的补充路径，主动操作永远走快路径。</li>
+      <li>把判定过程<b>打日志</b>：每个事件、每个阈值、每次状态翻转都可见 —— 时序 bug 的调试姿势，也是给用户/维护者的行为文档。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>实现要点</h2>
+    <ul>
+      <li>单击/双击：<code>mouseRelease</code> → <code>clickTimer.start(application.doubleClickInterval())</code>；<code>mouseDoubleClick</code> 先 <code>clickTimer.stop()</code> 再执行双击动作（<code>island.py:1119-1136</code>）。</li>
+      <li>拖动升级：<code>(e.position - press).manhattanLength() &gt; 4</code> → 停掉长按定时器、作废 press、进入 drag（<code>island.py:1107-1113</code>）。</li>
+      <li>长按：<code>QTimer(singleShot, interval=420)</code>（岛本体）/ <code>380ms</code>（导航栏空白处）——到时若仍未移动则触发 <code>begin_drag</code>。</li>
+      <li>播放键特判：快速连点播放键的第二次点击<b>当作双击处理但不切长关</b>（<code>island.py:1131</code>）—— 同一手势在不同热区语义不同。</li>
+      <li>本演示的 <code>doubleClickInterval</code> 用浏览器 <code>dblclick</code> 事件 + 300ms 定时器等价复刻；阈值 4px / 长按 380ms 与原版一致。</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+"use strict";
+const THRESH = 4;            // px（wisland island.py:1107）
+const LONG_PRESS = 380;      // ms（wisland nav.py:22；岛本体 420ms）
+const DBL_INTERVAL = 300;    // ms（等价 application.doubleClickInterval）
+
+const pill = document.getElementById("pill");
+const pillText = document.getElementById("pillText");
+const logEl = document.getElementById("log");
+const timerEl = document.getElementById("timer");
+const verdict = document.getElementById("verdict");
+
+let press = null;            // {x, y, t} 候选点击
+let dragging = false;
+let lpTimer = null;          // 长按定时器
+let clickTimer = null;       // 单击消歧定时器
+let slowMode = false;
+let t0 = performance.now();
+const events = [];
+
+function log(cls, msg) {
+  const t = ((performance.now() - t0) / 1000).toFixed(2);
+  events.push(`<div><span class="t">${t}s</span> <span class="${cls}">${msg}</span></div>`);
+  if (events.length > 60) events.shift();
+  logEl.innerHTML = "<h3>事件日志</h3>" + events.join("");
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function showVerdict(ok, msg) {
+  verdict.textContent = msg;
+  verdict.className = "verdict show " + (ok ? "ok" : "no");
+  clearTimeout(showVerdict._t);
+  showVerdict._t = setTimeout(() => verdict.classList.remove("show"), 1600);
+}
+function pos(e) {
+  const r = pill.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function clearTimers() {
+  clearTimeout(lpTimer); lpTimer = null;
+  clearTimeout(clickTimer); clickTimer = null;
+}
+function tick() {
+  const now = performance.now();
+  let lpPct = 0, clickPct = 0, lpLabel = "—", clickLabel = "—";
+  if (lpTimer && press) {
+    const el = now - press.t;
+    lpPct = Math.min(1, el / LONG_PRESS);
+    lpLabel = `${Math.min(el, LONG_PRESS).toFixed(0)} / ${LONG_PRESS}ms`;
+  }
+  if (clickTimer && clickTimer._start) {
+    const el = now - clickTimer._start;
+    clickPct = Math.min(1, el / DBL_INTERVAL);
+    clickLabel = `${Math.min(el, DBL_INTERVAL).toFixed(0)} / ${DBL_INTERVAL}ms`;
+  }
+  timerEl.innerHTML =
+    `<b>pointer</b>&nbsp;&nbsp; ${press ? `down (${press.x.toFixed(0)}, ${press.y.toFixed(0)})` : "up"}${dragging ? " · <span style='color:#fb923c'>DRAGGING</span>" : ""}<br>` +
+    `<b>位移</b>&nbsp;&nbsp;&nbsp;&nbsp; ${press ? Math.round(manhattan()) : 0}px / 阈值 ${THRESH}px <span class="bar"><i style="width:${press ? Math.min(100, manhattan() / THRESH * 100) : 0}%"></i></span><br>` +
+    `<b>长按</b>&nbsp;&nbsp;&nbsp;&nbsp; ${lpLabel} <span class="bar"><i style="width:${lpPct * 100}%"></i></span><br>` +
+    `<b>单击窗</b>&nbsp; ${clickLabel} <span class="bar"><i style="width:${clickPct * 100}%"></i></span>`;
+  requestAnimationFrame(tick);
+}
+let startPt = null;
+function manhattan() {
+  if (!press || !startPt) return 0;
+  return Math.abs(startPt.x - press.x) + Math.abs(startPt.y - press.y);
+}
+
+pill.addEventListener("pointerdown", e => {
+  clearTimers();
+  pill.setPointerCapture(e.pointerId);
+  press = { x: e.clientX, y: e.clientY, t: performance.now() };
+  startPt = pos(e);
+  dragging = false;
+  log("ev", `pointerdown — 候选点击（未定性）`);
+  // 长按定时器（不动才有效）
+  lpTimer = setTimeout(() => {
+    if (press && !dragging) {
+      log("warn", `长按 ${LONG_PRESS}ms 到 → 进入拖动模式（不等位移）`);
+      dragging = true;
+      pill.classList.add("moved");
+      pillText.textContent = "长按进入拖动 ✓";
+      showVerdict(true, `长按 ${LONG_PRESS}ms → begin_drag`);
+    }
+  }, LONG_PRESS);
+});
+
+pill.addEventListener("pointermove", e => {
+  if (!press) return;
+  press.x = e.clientX; press.y = e.clientY;
+  const m = manhattan();
+  if (!dragging && m > THRESH) {
+    // 4px 阈值：点击升级为拖动，作废长按与点击候选（island.py:1107）
+    clearTimeout(lpTimer); lpTimer = null;
+    dragging = true;
+    pill.classList.add("moved", "hot");
+    pillText.textContent = `拖动中 · 位移 ${m.toFixed(0)}px`;
+    log("go", `manhattan ${m.toFixed(1)} > ${THRESH} → 升级为拖动，长按定时器作废`);
+    showVerdict(true, `${m.toFixed(0)}px > 4px → 拖动，不再是点击`);
+  } else if (dragging) {
+    pillText.textContent = `拖动中 · 位移 ${m.toFixed(0)}px`;
+    const r = document.getElementById("pad").getBoundingClientRect();
+    const pr = pill.getBoundingClientRect();
+    pill.style.left = (e.clientX - r.left - pr.width / 2) + "px";
+    pill.style.top = (e.clientY - r.top - pr.height / 2) + "px";
+    pill.style.transform = "none";
+  } else if (m > 0) {
+    log("t", `位移 ${m.toFixed(1)}px — 未过 ${THRESH}px 阈值，仍算点击候选`);
+  }
+});
+
+pill.addEventListener("pointerup", e => {
+  if (!press) return;
+  const wasDragging = dragging;
+  const m = manhattan();
+  press = null;
+  if (wasDragging) {
+    log("ev", `pointerup — 拖动结束（位移 ${m.toFixed(0)}px）`);
+    setTimeout(() => {
+      dragging = false;
+      pill.classList.remove("moved", "hot");
+      pill.style.left = "50%"; pill.style.top = "76px"; pill.style.transform = "translateX(-50%)";
+      pillText.textContent = "按住我拖动 · 点我 · 双击我";
+    }, 500);
+    return;
+  }
+  // 点击候选：起单击定时器（island.py:1124-1130）
+  clearTimeout(lpTimer); lpTimer = null;
+  log("ev", `pointerup — 位移 ${m.toFixed(0)}px ≤ ${THRESH}px，起单击定时器 ${DBL_INTERVAL}ms`);
+  if (slowMode) {
+    showVerdict(false, `停在单击定时器里 ${DBL_INTERVAL}ms …（等 dblclick 取消它）`);
+  }
+  clickTimer = setTimeout(() => {
+    clickTimer = null;
+    log("go", `单击定时器到期 → 执行「单击」动作（expand / toggle）`);
+    showVerdict(true, "单击成立 ✓（窗口期内没有 dblclick）");
+    clickCount = 0;
+  }, DBL_INTERVAL);
+  clickTimer._start = performance.now();
+});
+
+let clickCount = 0;
+pill.addEventListener("dblclick", e => {
+  // 先取消单击定时器（island.py:1133 _click_timer.stop()）
+  if (clickTimer) {
+    log("warn", `dblclick 抢在单击定时器前 → 取消单击，执行双击动作（toggle_long_off）`);
+    clearTimeout(clickTimer); clickTimer = null;
+  } else {
+    log("warn", `dblclick — 单击已执行过一次，本次按双击语义处理`);
+  }
+  showVerdict(false, "双击成立 → 切换「长关」");
+});
+pill.addEventListener("pointercancel", () => { press = null; clearTimers(); });
+
+document.getElementById("clearBtn").onclick = () => { events.length = 0; logEl.innerHTML = "<h3>事件日志</h3>"; t0 = performance.now(); };
+document.getElementById("slowBtn").onclick = e => {
+  slowMode = !slowMode;
+  e.target.classList.toggle("on", slowMode);
+  e.target.textContent = slowMode ? "🐢 慢放：开" : "🐢 慢放演示（点击后停在定时器里）";
+};
+
+log("t", "就绪：试试 ①单点 ②快速双击 ③按住拖 ④按住不动 380ms");
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

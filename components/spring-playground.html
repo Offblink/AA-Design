@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>⚡ 阻尼弹簧 · AA-Design</title>
+<style>
+  :root{
+    --accent:#4f8cff;
+    --glass:rgba(255,255,255,0.06);
+    --line:rgba(255,255,255,0.12);
+    --muted:rgba(232,234,240,0.55);
+    --mono:Consolas,"Cascadia Mono","Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{background:#0a0a10}
+  body{
+    margin:0;padding:28px 20px 52px;color:#e8eaf0;
+    font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    line-height:1.6;
+  }
+  header{max-width:980px;margin:0 auto 16px}
+  .back{
+    display:inline-block;color:var(--muted);text-decoration:none;font-size:.86rem;
+    border:1px solid var(--line);border-radius:999px;padding:4px 14px;
+    background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    transition:.15s;
+  }
+  .back:hover{color:#e8eaf0;border-color:rgba(79,140,255,.5)}
+  h1{font-size:1.5rem;font-weight:700;margin:14px 0 4px}
+  .src{font-size:.8rem;color:var(--muted)}
+  .src code{font-family:var(--mono);color:#86b5ff}
+
+  #stage{
+    max-width:980px;margin:0 auto;min-height:520px;display:flex;gap:16px;padding:16px;
+    background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid var(--line);border-radius:16px;
+  }
+  .cvwrap{position:relative;flex:1;min-width:0;min-height:460px}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:default}
+
+  .panel{width:288px;flex:none;display:flex;flex-direction:column;gap:9px;font-size:.8rem;overflow-y:auto}
+  .panel h3{margin:2px 0 0;font-size:.72rem;letter-spacing:.08em;color:var(--muted);font-weight:600}
+  .hint{font-size:.74rem;color:var(--muted);line-height:1.5}
+  .knob{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:7px 11px 4px}
+  .knob .row{display:flex;justify-content:space-between;align-items:baseline}
+  .knob b{font-weight:600;font-size:.8rem}
+  .knob span{font-family:var(--mono);color:#86b5ff;font-size:.78rem}
+  input[type=range]{width:100%;accent-color:#4f8cff;height:18px;background:transparent;cursor:pointer;margin:2px 0 0}
+
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .pbtn{
+    font-family:inherit;background:rgba(79,140,255,0.10);border:1px solid rgba(79,140,255,0.32);
+    color:#cfe0ff;border-radius:10px;padding:6px 8px;font-size:.76rem;cursor:pointer;
+    transition:.15s;text-align:left;line-height:1.3;
+  }
+  .pbtn:hover{background:rgba(79,140,255,0.24)}
+  .pbtn.on{background:rgba(79,140,255,0.30);border-color:#4f8cff}
+  .pbtn small{display:block;color:var(--muted);font-size:.66rem;font-family:var(--mono)}
+  .actions{display:flex;gap:8px}
+  .actions button{
+    flex:1;font-family:inherit;background:rgba(255,255,255,0.06);border:1px solid var(--line);
+    color:#e8eaf0;border-radius:999px;padding:8px;font-size:.82rem;cursor:pointer;transition:.15s;
+  }
+  .actions button:hover{border-color:rgba(79,140,255,.5)}
+
+  .status{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:9px 11px;font-size:.76rem;display:flex;flex-direction:column;gap:3px}
+  .kv{display:flex;justify-content:space-between;gap:8px}
+  .kv i{font-style:normal;color:var(--muted)}
+  .kv b{font-family:var(--mono);font-weight:500;color:#e8eaf0}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  .dot.run{background:#7ee0a3;box-shadow:0 0 7px #7ee0a3}
+  .dot.stop{background:rgba(232,234,240,.28)}
+  .chip{display:inline-block;border-radius:999px;padding:0 9px;font-size:.7rem;border:1px solid}
+  .chip.under{color:#7ee0a3;border-color:rgba(126,224,163,.4);background:rgba(126,224,163,.10)}
+  .chip.crit{color:#cfd6e6;border-color:rgba(207,214,230,.35);background:rgba(207,214,230,.08)}
+  .chip.over{color:#ffb454;border-color:rgba(255,180,84,.4);background:rgba(255,180,84,.10)}
+  .sub{font-size:.7rem;color:var(--muted);font-family:var(--mono)}
+
+  .notes{max-width:980px;margin:22px auto 0;display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .notes h2{font-size:1rem;font-weight:600;color:var(--accent);margin:0 0 8px}
+  .notes ul{margin:0;padding-left:18px;color:rgba(232,234,240,0.75);font-size:.86rem}
+  .notes li{margin:7px 0}
+  .notes code{font-family:var(--mono);color:#86b5ff;font-size:.8em}
+
+  @media (max-width:880px){
+    #stage{flex-direction:column;height:auto}
+    .panel{width:auto}
+    .cvwrap{min-height:440px}
+    .notes{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="back" href="../index.html">← 画廊</a>
+  <h1>⚡ 阻尼弹簧 · 调参台</h1>
+  <div class="src">
+    源出：<code>wisland/ui/anim.py:8 Spring</code> ｜
+    预设参数：<code>ui/nav.py:40</code>、<code>ui/island.py:241 / 383 / 520 / 267</code>
+  </div>
+</header>
+
+<div id="stage">
+  <div class="cvwrap" id="cvwrap"><canvas id="cv"></canvas></div>
+
+  <aside class="panel">
+    <div class="hint">拖动轨道上的 <b style="color:#e8eaf0">◆</b> 或轨道任意处改变目标点；点预设载入 wisland 真实参数并发射对冲。</div>
+
+    <h3>参数</h3>
+    <div class="knob">
+      <div class="row"><b>刚度 k</b><span id="kVal">260</span></div>
+      <input type="range" id="kR" min="40" max="1200" step="5" value="260">
+    </div>
+    <div class="knob">
+      <div class="row"><b>阻尼比 ratio</b><span id="rVal">0.56</span></div>
+      <input type="range" id="rR" min="0.10" max="1.50" step="0.01" value="0.56">
+    </div>
+    <div class="knob">
+      <div class="row"><b>静止阈值 eps</b><span id="eVal">0.05</span></div>
+      <input type="range" id="eR" min="0" max="6" step="1" value="3">
+    </div>
+    <div class="sub" id="cVal">c = 2·ratio·√k = 18.1</div>
+    <div><span class="chip under" id="chip">欠阻尼 · 有回弹</span></div>
+
+    <h3>wisland 真实参数预设</h3>
+    <div class="presets" id="presets"></div>
+
+    <div class="actions">
+      <button id="fireBtn">发射（对冲）</button>
+      <button id="resetBtn">复位</button>
+    </div>
+
+    <h3>状态</h3>
+    <div class="status">
+      <div class="kv"><i>帧循环</i><b id="loopState"><span class="dot stop"></span>—</b></div>
+      <div class="kv"><i>累计帧</i><b id="framesV">0</b></div>
+      <div class="kv"><i>球 A x / v</i><b id="av">—</b></div>
+      <div class="kv"><i>球 A 目标 / 过冲</i><b id="at">—</b></div>
+      <div class="kv"><i>球 B x / v</i><b id="bv">—</b></div>
+      <div class="kv"><i>球 B 目标 / 过冲</i><b id="bt">—</b></div>
+      <div class="kv"><i>子步进</i><b id="subV">4 / 帧</b></div>
+    </div>
+  </aside>
+</div>
+
+<section class="notes">
+  <div>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li>所有形变 / 位移共用同一个 <code>Spring</code>，整颗水滴的手感、节奏完全统一，不会出现「这个动画 Q 弹、那个动画匀速」的割裂（<code>anim.py:2</code> 模块注释）。</li>
+      <li>欠阻尼（ratio &lt; 1）自带过冲回弹，比手写 ease 曲线更有生命力；wisland 的导航切换、尺寸形变都靠它营造「弹性缓动」（<code>nav.py:5</code> 注释「欠阻尼 -&gt; 弹性缓动」）。</li>
+      <li>rest 判定让定时器自己停帧：静止时 <code>timer.stop()</code>，零 CPU；一有交互再 <code>_kick()</code> 拉起，动画引擎不空转（<code>anim.py:45</code>、<code>island.py:647</code>）。</li>
+      <li>阻尼系数 c 由 k、ratio 两个直觉量推导，调参时不用单独拧「阻尼」这种难理解的物理量（<code>anim.py:16</code>）。</li>
+      <li>拖拽 / 抛出时把当前速度注入弹簧（<code>gap.v = -v_toward</code>），落点动量连续，不会「甩过去又凭空起步」（<code>island.py:519</code>）。</li>
+      <li>eps 按对象量级分级：导航 0.05px、岛屿几何 0.2px、按压形变 0.004——阈值越小越晚停帧，精度与开销各取所需。</li>
+    </ul>
+  </div>
+  <div>
+    <h2>实现要点</h2>
+    <ul>
+      <li><code>Spring</code> 定义于 <code>anim.py:8</code>，默认 stiffness=300、ratio=0.8、eps=0.05；阻尼 <code>c = 2·ratio·√k</code>（<code>anim.py:11/16</code>）。</li>
+      <li>积分是半隐式欧拉：先 <code>v += a·h</code> 再 <code>x += v·h</code>；按 <code>ceil(dt / (1/240))</code> 做 240Hz 子步进，高刚度也不炸（<code>anim.py:32 step</code>）。本页 60fps 每帧 4 个子步、30fps 8 个。</li>
+      <li>rest 条件：<code>|x−target| &lt; eps 且 |v| &lt; eps×8</code>（<code>anim.py:45-46</code>）；step 开头先判 rest，已静止则直接吸附目标、不积分。</li>
+      <li>本页预设均为源码真实值：导航宽度 k=260 / ratio=0.56 / eps=0.05（<code>nav.py:40</code>）、尺寸展开 k=420 / 0.62 / 0.2（<code>island.py:383</code>）、位置跟随 k=900 / 0.78 / 0.2（<code>island.py:241</code>）、贴边回吸 k=300 / 0.38 / 0.2（<code>island.py:520</code>）、按压 poke k=380 / 0.55 / 0.004（<code>island.py:267</code>）。</li>
+      <li>每帧 dt 夹在 <code>[1/240, 1/30]</code>（<code>island.py:556</code>），切后台回来不会大跳；ratio 越接近 1 回弹越少，&gt;1 过阻尼完全不越界。</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+"use strict";
+
+/* ================= Spring（移植 wisland/ui/anim.py:8） ================= */
+function clamp(x, lo, hi){ return x < lo ? lo : x > hi ? hi : x; }
+
+class Spring {
+  constructor(value = 0, stiffness = 300, ratio = 0.8, eps = 0.05){
+    this.x = value; this.v = 0; this.target = value;
+    this.k = stiffness;
+    this.c = 2 * ratio * Math.sqrt(stiffness);
+    this.eps = eps;
+  }
+  tune(stiffness, ratio){                 // anim.py:19
+    this.k = stiffness;
+    this.c = 2 * ratio * Math.sqrt(stiffness);
+  }
+  to(target){ this.target = target; }     // anim.py:23（本页参数经 tune 调整）
+  snap(value){ this.x = this.target = value; this.v = 0; }   // anim.py:28
+  step(dt){                               // anim.py:32
+    if (this.rest){ this.x = this.target; this.v = 0; return; }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240)));
+    const h = dt / n;
+    for (let i = 0; i < n; i++){
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h;
+      this.x += this.v * h;
+    }
+  }
+  get rest(){                            // anim.py:45
+    return Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8;
+  }
+}
+
+/* ================= 常量与状态 ================= */
+const FONT = '12px "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+const FONT_SM = '11px "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+const FONT_XS = '10px "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+const EPS_STEPS = [0.004, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5];
+const WINDOW_MS = 4000;
+
+const PRESETS = [
+  { id:'nav',  label:'导航栏宽度',   k:260, ratio:0.56, eps:0.05,  src:'nav.py:40' },
+  { id:'size', label:'岛屿尺寸展开', k:420, ratio:0.62, eps:0.2,   src:'island.py:383' },
+  { id:'pos',  label:'位置跟随',     k:900, ratio:0.78, eps:0.2,   src:'island.py:241' },
+  { id:'gap',  label:'贴边回吸 gap', k:300, ratio:0.38, eps:0.2,   src:'island.py:520' },
+  { id:'poke', label:'按压 poke',    k:380, ratio:0.55, eps:0.004, src:'island.py:267' },
+];
+
+const A = { sp:new Spring(25, 260, 0.56, 0.05), color:'#4f8cff', name:'A', cross:0, side:0 };
+const B = { sp:new Spring(75, 260, 0.56, 0.05), color:'#ffb454', name:'B', cross:0, side:0 };
+A.sp.target = 75;   // 初始即对冲
+B.sp.target = 25;
+
+const PARAM = { k:260, ratio:0.56, eps:0.05 };
+
+let samples = [];          // {t, xa, va, xb, vb}
+let running = false;
+let frames = 0, fps = 0, fpsT = 0, fpsN = 0;
+let lastT = 0, lastNow = 0;
+let drag = -1;
+
+/* ================= DOM ================= */
+const wrap = document.getElementById('cvwrap');
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = 640, H = 460, DPR = 1;
+
+const kR = document.getElementById('kR');
+const rR = document.getElementById('rR');
+const eR = document.getElementById('eR');
+const kVal = document.getElementById('kVal');
+const rVal = document.getElementById('rVal');
+const eVal = document.getElementById('eVal');
+const cVal = document.getElementById('cVal');
+const chip = document.getElementById('chip');
+const loopState = document.getElementById('loopState');
+const framesV = document.getElementById('framesV');
+const av = document.getElementById('av'), at = document.getElementById('at');
+const bv = document.getElementById('bv'), bt = document.getElementById('bt');
+const subV = document.getElementById('subV');
+
+/* ================= 预设按钮 ================= */
+const presetsEl = document.getElementById('presets');
+PRESETS.forEach(p => {
+  const b = document.createElement('button');
+  b.className = 'pbtn';
+  b.dataset.id = p.id;
+  b.innerHTML = p.label + '<small>k=' + p.k + ' r=' + p.ratio + ' · ' + p.src + '</small>';
+  b.addEventListener('click', () => applyPreset(p));
+  presetsEl.appendChild(b);
+});
+function markPreset(id){
+  presetsEl.querySelectorAll('.pbtn').forEach(b => b.classList.toggle('on', b.dataset.id === id));
+}
+
+/* ================= 参数同步 ================= */
+function syncLabels(){
+  kVal.textContent = PARAM.k;
+  rVal.textContent = PARAM.ratio.toFixed(2);
+  eVal.textContent = String(PARAM.eps);
+  const c = 2 * PARAM.ratio * Math.sqrt(PARAM.k);
+  cVal.textContent = 'c = 2·ratio·√k = ' + c.toFixed(1);
+  if (PARAM.ratio < 0.99){ chip.className = 'chip under'; chip.textContent = '欠阻尼 · 有回弹'; }
+  else if (PARAM.ratio > 1.01){ chip.className = 'chip over'; chip.textContent = '过阻尼 · 无回弹'; }
+  else { chip.className = 'chip crit'; chip.textContent = '临界阻尼 · 恰好不越界'; }
+  subV.textContent = Math.ceil((1/60) / (1/240)) + ' / 帧（60fps）';
+}
+function tuneAll(){
+  A.sp.tune(PARAM.k, PARAM.ratio); B.sp.tune(PARAM.k, PARAM.ratio);
+  A.sp.eps = PARAM.eps; B.sp.eps = PARAM.eps;
+}
+function setSlidersFromParam(){
+  kR.value = PARAM.k;
+  rR.value = PARAM.ratio;
+  eR.value = EPS_STEPS.indexOf(PARAM.eps);
+  if (eR.value < 0) eR.value = 3;
+}
+kR.addEventListener('input', () => { PARAM.k = +kR.value; tuneAll(); syncLabels(); markPreset(null); kick(); });
+rR.addEventListener('input', () => { PARAM.ratio = +rR.value; tuneAll(); syncLabels(); markPreset(null); kick(); });
+eR.addEventListener('input', () => { PARAM.eps = EPS_STEPS[+eR.value]; tuneAll(); syncLabels(); markPreset(null); kick(); });
+
+function applyPreset(p){
+  PARAM.k = p.k; PARAM.ratio = p.ratio; PARAM.eps = p.eps;
+  setSlidersFromParam(); tuneAll(); syncLabels(); markPreset(p.id);
+  fire();
+}
+
+/* ================= 交互动作 ================= */
+function resetCross(){ A.cross = 0; A.side = 0; B.cross = 0; B.side = 0; }
+
+function fire(){                 // 对冲：两球互换目标，清曲线重新看响应
+  A.sp.target = 100 - A.sp.target;
+  B.sp.target = 100 - B.sp.target;
+  samples.length = 0;
+  resetCross();
+  kick();
+}
+function resetAll(){
+  A.sp.snap(25); B.sp.snap(75);
+  A.sp.target = 75; B.sp.target = 25;
+  samples.length = 0;
+  resetCross();
+  frames = 0; fps = 0;
+  draw(performance.now());
+}
+function setTarget(o, v){
+  v = clamp(v, 0, 100);
+  if (Math.abs(v - o.sp.target) < 1e-9) return;
+  o.sp.target = v;
+  resetCross();
+  kick();
+}
+document.getElementById('fireBtn').addEventListener('click', fire);
+document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+/* ================= 帧循环（rAF，rest 后停止 ≈ wisland timer.stop） ================= */
+function kick(){
+  if (running) return;
+  running = true;
+  lastT = performance.now();
+  fpsT = lastT; fpsN = 0;
+  requestAnimationFrame(loop);
+}
+function loop(t){
+  let dt = (t - lastT) / 1000;
+  lastT = t; lastNow = t;
+  dt = Math.min(1/30, Math.max(1/240, dt));   // island.py:556
+  A.sp.step(dt); B.sp.step(dt);
+  frames++;
+  countCross(A); countCross(B);
+  samples.push({ t, xa:A.sp.x, va:A.sp.v, xb:B.sp.x, vb:B.sp.v });
+  const cut = t - (WINDOW_MS + 600);
+  while (samples.length && samples[0].t < cut) samples.shift();
+  fpsN++;
+  if (t - fpsT >= 500){ fps = Math.round(fpsN * 1000 / (t - fpsT)); fpsT = t; fpsN = 0; }
+  draw(t);
+  if (A.sp.rest && B.sp.rest){ running = false; draw(t); return; }   // anim.py:45 → 停帧
+  requestAnimationFrame(loop);
+}
+function countCross(o){
+  const d = o.sp.x - o.sp.target;
+  if (Math.abs(d) >= Math.max(o.sp.eps, 0.6)){
+    const s = d > 0 ? 1 : -1;
+    if (o.side !== 0 && s !== o.side) o.cross++;
+    o.side = s;
+  }
+}
+
+/* ================= 指针交互 ================= */
+function pt(e){
+  const r = cv.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+const padL = 46, padR = 22;
+const trackY = [52, 110];
+function val2x(v){ return padL + (v / 100) * (W - padL - padR); }
+function x2val(px){ return clamp((px - padL) / (W - padL - padR) * 100, 0, 100); }
+function trackHit(p){
+  for (let i = 0; i < trackY.length; i++) if (Math.abs(p.y - trackY[i]) <= 24) return i;
+  return -1;
+}
+cv.addEventListener('pointerdown', e => {
+  const p = pt(e);
+  const i = trackHit(p);
+  if (i < 0) return;
+  drag = i;
+  cv.setPointerCapture(e.pointerId);
+  cv.style.cursor = 'grabbing';
+  setTarget(i === 0 ? A : B, x2val(p.x));
+});
+cv.addEventListener('pointermove', e => {
+  const p = pt(e);
+  if (drag >= 0){ setTarget(drag === 0 ? A : B, x2val(p.x)); return; }
+  cv.style.cursor = trackHit(p) >= 0 ? 'grab' : 'default';
+});
+function endDrag(){ drag = -1; cv.style.cursor = 'default'; }
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+
+/* ================= 尺寸 ================= */
+function resize(){
+  const r = wrap.getBoundingClientRect();
+  W = Math.max(320, Math.round(r.width));
+  H = Math.max(400, Math.round(r.height));
+  DPR = window.devicePixelRatio || 1;
+  cv.width = Math.round(W * DPR);
+  cv.height = Math.round(H * DPR);
+  draw(lastNow || performance.now());
+}
+window.addEventListener('resize', resize);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(wrap);
+
+/* ================= 绘制 ================= */
+function rr(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+const xTop = 152, xBot = () => H - 118;
+const vTop = () => H - 104, vBot = () => H - 30;
+
+function draw(t){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  drawTracks();
+  drawXPlot(t);
+  drawVPlot(t);
+  updateStatus();
+}
+
+function drawTracks(){
+  ctx.font = FONT_XS;
+  ctx.fillStyle = 'rgba(232,234,240,0.55)';
+  ctx.textAlign = 'left';
+  ctx.fillText('① 轨道 · 拖动 ◆ 改变目标', 14, 22);
+
+  [A, B].forEach((o, i) => {
+    const y = trackY[i], sp = o.sp;
+    // 轨道线
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+
+    // 目标标记：虚线 + 菱形
+    const tx = val2x(sp.target);
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.strokeStyle = o.color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(tx, y - 22); ctx.lineTo(tx, y + 22); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = o.color;
+    ctx.translate(tx, y - 28); ctx.rotate(Math.PI / 4);
+    ctx.fillRect(-4.5, -4.5, 9, 9);
+    ctx.restore();
+
+    // 小球
+    const bx = val2x(sp.x);
+    ctx.save();
+    ctx.shadowColor = o.color; ctx.shadowBlur = 12;
+    ctx.fillStyle = o.color;
+    ctx.beginPath(); ctx.arc(bx, y, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(bx - 3, y - 3.5, 3, 0, Math.PI * 2); ctx.fill();
+
+    // 名称与读数
+    ctx.font = FONT;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = o.color;
+    ctx.fillText(o.name, 14, y + 4);
+    ctx.font = FONT_XS;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(232,234,240,0.60)';
+    const txt = 'x ' + sp.x.toFixed(1) + '   v ' + (sp.v >= 0 ? '+' : '') + sp.v.toFixed(1);
+    const tw = ctx.measureText(txt).width;
+    const lx = clamp(bx, padL + tw / 2, W - padR - tw / 2);
+    ctx.fillText(txt, lx, y + 27);
+  });
+}
+
+function drawXPlot(t){
+  const top = xTop, bot = xBot();
+  const bx0 = 12, bw = W - 24;
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  rr(bx0, top - 26, bw, bot - top + 44, 10); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+  rr(bx0 + .5, top - 25.5, bw - 1, bot - top + 43, 10); ctx.stroke();
+
+  const suffix = running ? '' : '  · 已停帧（rest）';
+  ctx.font = FONT_SM;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = running ? 'rgba(232,234,240,0.75)' : '#7ee0a3';
+  ctx.fillText('② x(t) 位置曲线（最近 4 秒）' + suffix, 20, top - 10);
+
+  // 图例
+  ctx.textAlign = 'right';
+  ctx.fillStyle = A.color; ctx.fillText('— 球A', W - 74, top - 10);
+  ctx.fillStyle = B.color; ctx.fillText('— 球B', W - 20, top - 10);
+
+  // 横向网格 0/50/100
+  ctx.font = FONT_XS;
+  [0, 50, 100].forEach(v => {
+    const y = bot - (v / 100) * (bot - top);
+    ctx.strokeStyle = v === 50 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.09)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(232,234,240,0.45)';
+    ctx.textAlign = 'right';
+    ctx.fillText(String(v), padL - 6, y + 3);
+  });
+
+  // 目标虚线
+  [[A, '目标A'], [B, '目标B']].forEach(([o, lbl], i) => {
+    const y = bot - (o.sp.target / 100) * (bot - top);
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = o.color; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.restore();
+    ctx.font = FONT_XS; ctx.textAlign = 'left';
+    ctx.fillStyle = o.color;
+    ctx.globalAlpha = 0.75;
+    ctx.fillText(lbl + ' ' + o.sp.target.toFixed(0), padL + 6, y + (i ? 12 : -5));
+    ctx.globalAlpha = 1;
+  });
+
+  // 时间轴
+  const tMin = t - WINDOW_MS;
+  const mapT = s => padL + clamp((s - tMin) / WINDOW_MS, 0, 1) * (W - padL - padR);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(232,234,240,0.45)';
+  for (let s = 3; s >= 1; s--){
+    const x = mapT(t - s * 1000);
+    if (x > padL + 14 && x < W - padR - 24){
+      ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke();
+      ctx.fillText('−' + s + 's', x, bot + 15);
+    }
+  }
+  ctx.fillStyle = 'rgba(232,234,240,0.45)';
+  ctx.fillText('现在', W - padR - 18, bot + 15);
+
+  // 曲线
+  const visible = samples.filter(s => s.t >= tMin);
+  [[A, 'xa'], [B, 'xb']].forEach(([o, key]) => {
+    if (visible.length < 2) return;
+    ctx.strokeStyle = o.color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    visible.forEach((s, i) => {
+      const x = mapT(s.t);
+      const y = bot - (s[key] / 100) * (bot - top);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+  });
+
+  // 停帧标记
+  if (!running && visible.length){
+    const x = mapT(visible[visible.length - 1].t);
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#7ee0a3'; ctx.lineWidth = 1; ctx.setLineDash([2, 3]);
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawVPlot(t){
+  const top = vTop(), bot = vBot();
+  const bx0 = 12, bw = W - 24;
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  rr(bx0, top - 26, bw, bot - top + 36, 10); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+  rr(bx0 + .5, top - 25.5, bw - 1, bot - top + 35, 10); ctx.stroke();
+
+  ctx.font = FONT_SM;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(232,234,240,0.75)';
+  ctx.fillText('③ 速度 v(t)', 20, top - 10);
+
+  const tMin = t - WINDOW_MS;
+  const visible = samples.filter(s => s.t >= tMin);
+  let maxV = 40;
+  visible.forEach(s => { maxV = Math.max(maxV, Math.abs(s.va), Math.abs(s.vb)); });
+  maxV *= 1.25;
+  const mid = (top + bot) / 2;
+  const yv = v => mid - (v / maxV) * ((bot - top) / 2);
+
+  // 零线与刻度
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padL, mid); ctx.lineTo(W - padR, mid); ctx.stroke();
+  ctx.font = FONT_XS;
+  ctx.fillStyle = 'rgba(232,234,240,0.45)';
+  ctx.textAlign = 'right';
+  ctx.fillText('+' + maxV.toFixed(0), padL - 6, top + 8);
+  ctx.fillText('0', padL - 6, mid + 3);
+  ctx.fillText('−' + maxV.toFixed(0), padL - 6, bot);
+
+  const mapT = s => padL + clamp((s - tMin) / WINDOW_MS, 0, 1) * (W - padL - padR);
+  [[A, 'va'], [B, 'vb']].forEach(([o, key]) => {
+    if (visible.length < 2) return;
+    ctx.strokeStyle = o.color;
+    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    visible.forEach((s, i) => {
+      const x = mapT(s.t), y = yv(s[key]);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+}
+
+function updateStatus(){
+  loopState.innerHTML = running
+    ? '<span class="dot run"></span>运行中 · ' + fps + ' fps'
+    : '<span class="dot stop"></span>已停帧（rest → 0 CPU）';
+  framesV.textContent = String(frames);
+  av.textContent = A.sp.x.toFixed(1) + ' / ' + (A.sp.v >= 0 ? '+' : '') + A.sp.v.toFixed(1);
+  at.textContent = A.sp.target.toFixed(0) + ' / ' + A.cross + ' 次';
+  bv.textContent = B.sp.x.toFixed(1) + ' / ' + (B.sp.v >= 0 ? '+' : '') + B.sp.v.toFixed(1);
+  bt.textContent = B.sp.target.toFixed(0) + ' / ' + B.cross + ' 次';
+}
+
+/* ================= 启动 ================= */
+setSlidersFromParam();
+tuneAll();
+syncLabels();
+markPreset('nav');
+resize();
+kick();          // 初始即对冲一次，打开就能看到 x(t) 曲线
+</script>
+</body>
+</html>

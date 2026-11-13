@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🪟 毛玻璃管线 · AA-Design</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    min-height: 100vh;
+    padding: 32px 24px 56px;
+  }
+  header { max-width: 1080px; margin: 0 auto 24px; }
+  header a.back {
+    display: inline-block;
+    color: rgba(232,234,240,0.55);
+    text-decoration: none;
+    font-size: 0.875rem;
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: color .15s, border-color .15s;
+  }
+  header a.back:hover { color: #e8eaf0; border-color: rgba(255,255,255,0.24); }
+  h1 { font-size: 1.5rem; font-weight: 700; margin: 14px 0 6px; }
+  .src {
+    font-size: 0.78rem;
+    color: rgba(232,234,240,0.55);
+    line-height: 1.7;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    word-break: break-all;
+  }
+  .src b { color: #4f8cff; font-weight: 600; }
+
+  /* ================= 舞台 ================= */
+  #stage {
+    max-width: 1080px;
+    height: 524px;
+    margin: 0 auto;
+    display: flex;
+    gap: 20px;
+  }
+  .demo {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: #05060c;
+  }
+  .demo canvas.bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  #bgA { opacity: 1; }
+  #bgB { opacity: 0; }
+
+  .demo .cap {
+    position: absolute;
+    left: 14px;
+    top: 12px;
+    z-index: 30;
+    font-size: 0.72rem;
+    color: rgba(232,234,240,0.72);
+    background: rgba(10,10,16,0.55);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 4px 12px;
+  }
+
+  /* ---------- 灵动岛本体（演示主体） ---------- */
+  #island {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 440px;
+    height: 212px;
+    border-radius: 26px;
+    overflow: hidden;
+    z-index: 10;
+    /* 1) 柔和阴影：三层半透明描边近似（wisland 下移1.5px、(14,5)(8,9)(4,14)） */
+    box-shadow:
+      0 1.5px 7px 7px rgba(0,0,0,0.05),
+      0 1.5px 4px 4px rgba(0,0,0,0.09),
+      0 1.5px 2px 2px rgba(0,0,0,0.14);
+  }
+  #island.no-shadow { box-shadow: none; }
+  #island .layer { position: absolute; inset: 0; }
+  /* ② backdrop 毛玻璃底：浏览器等价物 */
+  #l-backdrop { backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+  /* ③ tint 色调层：dark 主题 rgba(28,28,34,120) */
+  #l-tint { background: rgba(28,28,34,0.4706); }
+  /* ④ 纵向光泽：顶部白 14 → 50% 处 0 → 底部 10 */
+  #l-sheen {
+    background: linear-gradient(180deg,
+      rgba(255,255,255,0.0549) 0%,
+      rgba(255,255,255,0) 50%,
+      rgba(255,255,255,0.0392) 100%);
+  }
+  /* ⑤ rim：外侧暗描边 + 内侧高光渐变（SVG 精确描边） */
+  #l-rim { pointer-events: none; }
+  #island .content {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+  }
+  #island .row1 { display: flex; align-items: center; gap: 14px; }
+  #island .disc {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: conic-gradient(from 210deg, #4f8cff, #a855f7, #ff8a4c, #34d399, #4f8cff);
+    box-shadow: 0 0 18px rgba(79,140,255,0.45);
+    display: grid; place-items: center;
+    font-size: 1.25rem;
+  }
+  #island .meta { text-align: left; }
+  #island .t1 { font-size: 1.02rem; font-weight: 600; letter-spacing: .02em; }
+  #island .t2 { font-size: 0.8rem; color: rgba(232,234,240,0.66); margin-top: 3px; }
+  #island .pill {
+    font-size: 0.72rem;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.204);
+    color: #fff;
+  }
+  #island .track { width: 260px; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.133); overflow: hidden; }
+  #island .track i { display: block; height: 100%; width: 46%; background: rgba(255,255,255,0.92); border-radius: 999px; }
+
+  /* ---------- 控制面板 ---------- */
+  .panel {
+    width: 312px;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    overflow: auto;
+  }
+  .panel h3 { font-size: 0.95rem; font-weight: 600; color: #4f8cff; }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 10px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s;
+  }
+  .row:hover { background: rgba(255,255,255,0.08); }
+  .row input { accent-color: #4f8cff; width: 15px; height: 15px; flex-shrink: 0; }
+  .row .nm { font-size: 0.83rem; flex: 1; white-space: nowrap; }
+  .row .val {
+    font-size: 0.7rem;
+    color: rgba(232,234,240,0.55);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    white-space: nowrap;
+  }
+  .btn {
+    font: inherit;
+    font-size: 0.86rem;
+    color: #fff;
+    background: #4f8cff;
+    border: none;
+    border-radius: 999px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: filter .15s, opacity .15s;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .hud { font-size: 0.75rem; color: rgba(232,234,240,0.55); }
+  .hud .hud-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .hud .hud-row b { color: #4f8cff; font-weight: 600; }
+  .bar { height: 5px; border-radius: 999px; background: rgba(255,255,255,0.12); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0%; background: #4f8cff; border-radius: 999px; }
+  .hud .eq {
+    margin-top: 7px;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.68rem;
+    color: rgba(232,234,240,0.45);
+  }
+  .pipe { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .pipe span {
+    font-size: 0.68rem;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(79,140,255,0.16);
+    border: 1px solid rgba(79,140,255,0.35);
+    color: #9dbcff;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  .pipe em { font-style: normal; color: rgba(232,234,240,0.4); font-size: 0.7rem; }
+
+  /* ================= 说明 ================= */
+  .notes { max-width: 1080px; margin: 32px auto 0; display: flex; gap: 20px; }
+  .notes > div {
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 22px 24px;
+  }
+  .notes h2 { font-size: 1rem; font-weight: 600; color: #4f8cff; margin-bottom: 12px; }
+  .notes ol { padding-left: 20px; display: flex; flex-direction: column; gap: 9px; }
+  .notes li { font-size: 0.875rem; line-height: 1.65; color: rgba(232,234,240,0.82); }
+  .notes li b { color: #e8eaf0; font-weight: 600; }
+  .notes code {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.78rem;
+    color: #9dbcff;
+    background: rgba(79,140,255,0.12);
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../index.html" class="back">← 画廊</a>
+  <h1>🪟 毛玻璃管线</h1>
+  <div class="src">
+    <b>wisland/ui/island.py:967</b> _paint_glass() · <b>wisland/ui/island.py:946</b> paintEvent() · <b>wisland/ui/island.py:902</b> _request_backdrop()<br>
+    <b>wisland/ui/glass.py:56</b> _blur() · <b>wisland/ui/glass.py:69</b> grab_tiny() · <b>wisland/ui/glass.py:180</b> _capture() · <b>wisland/ui/glass.py:208</b> brush_for()
+  </div>
+</header>
+
+<div id="stage">
+  <!-- ========== 演示区：身后画面 + 分层玻璃 ========== -->
+  <div class="demo" id="demo">
+    <canvas class="bg" id="bgA"></canvas>
+    <canvas class="bg" id="bgB"></canvas>
+    <div class="cap">身后画面（canvas 动态场景）</div>
+
+    <div id="island">
+      <!-- ② backdrop 毛玻璃底 -->
+      <div class="layer" id="l-backdrop"></div>
+      <!-- ③ tint 色调层 -->
+      <div class="layer" id="l-tint"></div>
+      <!-- ④ 纵向光泽 -->
+      <div class="layer" id="l-sheen"></div>
+      <!-- ⑤ 外侧暗描边 + 内侧高光 rim -->
+      <svg class="layer" id="l-rim" width="440" height="212" viewBox="0 0 440 212">
+        <defs>
+          <linearGradient id="rimG" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.2353"/>
+            <stop offset="1" stop-color="#ffffff" stop-opacity="0.0549"/>
+          </linearGradient>
+        </defs>
+        <rect x="0.8" y="0.8" width="438.4" height="210.4" rx="25.2" fill="none" stroke="rgba(0,0,0,0.2745)" stroke-width="1.6"/>
+        <rect x="0.5" y="0.5" width="439" height="211" rx="25.5" fill="none" stroke="url(#rimG)" stroke-width="1"/>
+      </svg>
+      <!-- 内容（与 wisland 一致：画在玻璃之上） -->
+      <div class="content">
+        <div class="row1">
+          <div class="disc">🎵</div>
+          <div class="meta">
+            <div class="t1">Wisland · 毛玻璃分层配方</div>
+            <div class="t2">backdrop → tint → sheen → rim → shadow</div>
+          </div>
+        </div>
+        <div class="track"><i></i></div>
+        <div class="pill">五层逐层开关，看玻璃怎样炼成</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 控制面板 ========== -->
+  <div class="panel">
+    <h3>玻璃配方分层</h3>
+    <label class="row"><input type="checkbox" checked data-kind="layer" data-layer="l-backdrop"><span class="nm">① backdrop 毛玻璃底</span><span class="val">blur(18px)</span></label>
+    <label class="row"><input type="checkbox" checked data-kind="layer" data-layer="l-tint"><span class="nm">② tint 色调层</span><span class="val">rgba(28,28,34,120)</span></label>
+    <label class="row"><input type="checkbox" checked data-kind="layer" data-layer="l-sheen"><span class="nm">③ 纵向光泽</span><span class="val">14 → 0 → 10</span></label>
+    <label class="row"><input type="checkbox" checked data-kind="layer" data-layer="l-rim"><span class="nm">④ 暗描边 + 高光 rim</span><span class="val">1.6px / 60→14</span></label>
+    <label class="row"><input type="checkbox" checked data-kind="shadow" data-layer="island"><span class="nm">⑤ 三层柔和阴影</span><span class="val">(14,5)(8,9)(4,14)</span></label>
+
+    <h3 style="margin-top:4px">交叉淡入 0.25s</h3>
+    <button class="btn" id="switchBtn">切换背景画面 🔄</button>
+    <div class="hud">
+      <div class="hud-row"><span>fade 进度</span><b id="fadePct">待切换</b></div>
+      <div class="bar"><i id="fadeBar"></i></div>
+      <div class="eq">fade = (now − _bd_fade_t0) / 0.25</div>
+    </div>
+
+    <h3 style="margin-top:4px">wisland 截取管线</h3>
+    <div class="pipe">
+      <span>grab_tiny</span><em>→</em><span>×1/12</span><em>→</em><span>_blur×2</span><em>→</em><span>brush_for</span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 说明 ================= -->
+<section class="notes">
+  <div>
+    <h2>为什么值得借鉴</h2>
+    <ol>
+      <li><b>配方拆成五层，每层可独立调校。</b>wisland 的 <code>paintEvent()</code> 用 <code>1) 阴影 / 2) 玻璃底 / 3) 色调+光泽 / 4) 轮廓</code> 编号注释把配方分层（island.py:953、970、991、959），改任意一层不动其它层，主题切换也只是换色值。</li>
+      <li><b>交叉淡入消灭背景跳变。</b>新截图到来时先铺旧纹理、再按 fade 叠新纹理（island.py:970 注释「新截图与上一张交叉淡入，避免跳变」），0.25s 内完成，身后画面刷新不会「啪」地跳一下。</li>
+      <li><b>收起时预截取展开尺寸背景。</b>源码注释原话：「收起时也预先截取展开尺寸的背景：打开的第一帧就有正确的玻璃，不会闪」（island.py:909）——把昂贵的准备藏在状态切换之前。</li>
+      <li><b>阴影用多层半透明描边廉价近似。</b>「柔和阴影（几层半透明描边，廉价近似）」（island.py:953），三圈描边代替高斯模糊阴影，几乎零成本。</li>
+      <li><b>外暗内亮双描边勾出玻璃厚度。</b>外侧 1.6px 极淡暗线 + 内侧 1px「上亮下暗」高光渐变（island.py:959-964），立体感全靠这两条边，而不是投影。</li>
+    </ol>
+  </div>
+  <div>
+    <h2>实现要点</h2>
+    <ol>
+      <li><b>截取管线四步：</b><code>glass.py:18</code> <code>DOWN = 12</code> 缩小 1/12（越大越糊）→ <code>glass.py:69 grab_tiny()</code> HALFTONE 面积平均截屏（:84 特意不用 CAPTUREBLT，它会让分层窗口闪烁）→ <code>glass.py:56 _blur()</code> 3×3 平均，第 k 张按 1/k 不透明度叠加，结果正好是平均值不会变亮 → <code>glass.py:208 brush_for()</code> 把小图按 <code>rect/tiny</code> 比例 scale 回窗口坐标当画刷。</li>
+      <li><b>判变与平滑：</b><code>glass.py:193 _capture()</code> 连做两次 <code>_blur(_blur(img))</code>；再缩到 8×4 当指纹（:195）、缩到 1×1 取 <code>pixelColor</code> 算亮度（:196-197 Rec.709 权重），指纹变了 <code>_on_backdrop(changed=True)</code>（island.py:936）才重置淡入计时。</li>
+      <li><b>色调与光泽数值：</b>dark 主题 tint <code>(28,28,34,120)</code>（theme.py:88）≈ CSS <code>rgba(28,28,34,.47)</code>；纵向光泽 <code>island.py:995-997</code> 顶部白 alpha <code>26 if not theme.dark else 14</code>（深色 14、浅色 26）→ 50% 处 0 → 底部 10。</li>
+      <li><b>描边与阴影数值：</b>rim 用 outline <code>(0,0,0,70)</code> 1.6px + 高光渐变 rim1 <code>(255,255,255,60)</code> → rim2 <code>(…,14)</code> 1.0px（theme.py:91、island.py:960-964）；阴影 path 下移 1.5px 后描 <code>(14,5)(8,9)(4,14)</code> 三圈，宽度递减、alpha 递增（island.py:954-955）。</li>
+      <li><b>交叉淡入：</b><code>island.py:973</code> <code>fade = (perf_counter − _bd_fade_t0) / 0.25</code>，旧纹理铺底、新纹理按 fade 叠加；触发点在 <code>_on_backdrop</code>（island.py:940-942 只有 changed 才记 <code>_bd_prev/_bd_fade_t0</code>）。</li>
+      <li><b>浏览器近似：</b>网页截不到「身后屏幕」，用 <code>backdrop-filter: blur(18px)</code> 近似整条截取管线；wisland 是交叉淡入玻璃里的两张纹理，这里改为两张背景 canvas 交叉淡化 0.25s 来演示同一手感。真实 wisland 还会降频：静止收起时 <code>island.blur_fps</code> 默认 10 再压到 3fps（island.py:902 _request_backdrop()）。</li>
+    </ol>
+  </div>
+</section>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================= 分层开关 ================= */
+  var island = document.getElementById("island");
+  document.querySelectorAll(".row input").forEach(function (cb) {
+    cb.addEventListener("change", function () {
+      if (cb.dataset.kind === "shadow") {
+        island.classList.toggle("no-shadow", !cb.checked);
+      } else {
+        var el = document.getElementById(cb.dataset.layer);
+        if (el) el.style.display = cb.checked ? "" : "none";
+      }
+    });
+  });
+
+  /* ================= 两个背景场景（rAF 自绘） ================= */
+  var cvs = [document.getElementById("bgA"), document.getElementById("bgB")];
+  var ctx = cvs.map(function (c) { return c.getContext("2d"); });
+  var sceneOf = [0, 1];          // 每张 canvas 当前承载的场景编号
+  var front = 0;                 // 正在展示的 canvas 下标
+  var FADE_MS = 250;             // wisland: fade = elapsed / 0.25
+
+  function drawAurora(c, w, h, t) {
+    c.fillStyle = "#05060f";
+    c.fillRect(0, 0, w, h);
+    var blobs = [
+      [0.26, 0.42, 0.16, "79,140,255"],
+      [0.62, 0.60, 0.20, "168,85,247"],
+      [0.80, 0.30, 0.15, "255,138,76"],
+      [0.45, 0.78, 0.14, "52,211,153"]
+    ];
+    c.globalCompositeOperation = "lighter";
+    for (var i = 0; i < blobs.length; i++) {
+      var b = blobs[i];
+      var x = (b[0] + 0.07 * Math.sin(t * 0.42 + i * 1.9)) * w;
+      var y = (b[1] + 0.06 * Math.cos(t * 0.33 + i * 1.3)) * h;
+      var r = b[2] * Math.min(w, h) * (1 + 0.16 * Math.sin(t * 0.6 + i));
+      var g = c.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, "rgba(" + b[3] + ",0.55)");
+      g.addColorStop(1, "rgba(" + b[3] + ",0)");
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(x, y, r, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.globalCompositeOperation = "source-over";
+  }
+
+  function drawWaves(c, w, h, t) {
+    c.fillStyle = "#04121c";
+    c.fillRect(0, 0, w, h);
+    var cols = ["56,189,248", "79,140,255", "52,211,153", "226,240,255"];
+    for (var k = 0; k < 4; k++) {
+      c.beginPath();
+      for (var x = 0; x <= w; x += 6) {
+        var y = h * 0.5
+          + Math.sin(x * 0.012 + t * (0.8 + k * 0.28) + k * 1.45) * (26 + k * 13)
+          + (k - 1.5) * 30;
+        if (x === 0) c.moveTo(x, y); else c.lineTo(x, y);
+      }
+      c.strokeStyle = "rgba(" + cols[k] + ",0.75)";
+      c.lineWidth = 3;
+      c.stroke();
+    }
+    // 随时间闪烁的光点，强化"身后画面在变"
+    for (var i = 0; i < 26; i++) {
+      var px = ((i * 97) % 100) / 100 * w;
+      var py = ((i * 53) % 100) / 100 * h;
+      var a = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(t * 2 + i));
+      c.fillStyle = "rgba(160,220,255," + a.toFixed(3) + ")";
+      c.beginPath();
+      c.arc(px, py, 2.2, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+
+  var scenes = [drawAurora, drawWaves];
+
+  function fit() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var r = document.getElementById("demo").getBoundingClientRect();
+    cvs.forEach(function (c) {
+      c.width = Math.max(2, Math.round(r.width * dpr));
+      c.height = Math.max(2, Math.round(r.height * dpr));
+    });
+  }
+
+  function render(i, tMs) {
+    var w = cvs[i].width, h = cvs[i].height;
+    scenes[sceneOf[i]](ctx[i], w, h, tMs / 1000);
+  }
+
+  /* ================= 0.25s 交叉淡入 ================= */
+  var fadeT0 = -1;
+  var back = -1;
+  var btn = document.getElementById("switchBtn");
+  var fadeBar = document.getElementById("fadeBar");
+  var fadePct = document.getElementById("fadePct");
+
+  function switchScene() {
+    if (fadeT0 >= 0) return;
+    back = 1 - front;
+    sceneOf[back] = 1 - sceneOf[front];
+    render(back, performance.now());
+    fadeT0 = performance.now();
+    btn.disabled = true;
+  }
+  btn.addEventListener("click", switchScene);
+
+  function ease(p) { return p * p * (3 - 2 * p); } // smoothstep，与 Qt 平滑过渡手感一致
+
+  function loop(now) {
+    render(front, now);
+    if (fadeT0 >= 0) {
+      render(back, now);
+      var p = Math.min(1, (now - fadeT0) / FADE_MS);
+      var e = ease(p);
+      cvs[front].style.opacity = String(1 - e);
+      cvs[back].style.opacity = String(e);
+      fadeBar.style.width = (p * 100).toFixed(1) + "%";
+      fadePct.textContent = "0.25s · " + Math.round(p * 100) + "%";
+      if (p >= 1) {
+        front = back;
+        back = -1;
+        fadeT0 = -1;
+        cvs[front].style.opacity = "1";
+        cvs[1 - front].style.opacity = "0";
+        btn.disabled = false;
+        fadePct.textContent = "完成 · 已换新画面";
+        setTimeout(function () {
+          if (fadeT0 < 0) fadeBar.style.width = "0%";
+        }, 600);
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+
+  fit();
+  render(0, performance.now());
+  render(1, performance.now());
+  window.addEventListener("resize", function () {
+    fit();
+    render(front, performance.now());
+    if (back >= 0) render(back, performance.now());
+  });
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

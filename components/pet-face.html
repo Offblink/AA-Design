@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小形象状态机 · AA-Design</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#0a0a10; color:#e8eaf0; min-height:100vh;
+  font-family:"HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+}
+header { padding:32px 24px 8px; max-width:960px; margin:0 auto; }
+header a { color:rgba(232,234,240,0.55); text-decoration:none; font-size:0.85rem; }
+header a:hover { color:#4f8cff; }
+header h1 { font-size:1.5rem; font-weight:700; margin-top:10px; }
+header .src { font-family:Consolas,monospace; font-size:0.75rem; color:rgba(232,234,240,0.4); margin-top:6px; }
+header .src code { color:#7dd3fc; }
+#stage {
+  position:relative; max-width:960px; margin:18px auto 0; height:480px;
+  border-radius:16px; overflow:hidden;
+  background:linear-gradient(160deg,#12161f 0%,#0d1420 55%,#101826 100%);
+  border:1px solid rgba(255,255,255,0.12);
+}
+canvas { display:block; width:100%; height:100%; cursor:pointer; }
+.hud {
+  position:absolute; top:14px; right:14px; z-index:3;
+  background:rgba(10,10,16,0.72); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; padding:10px 14px; font-family:Consolas,monospace;
+  font-size:0.72rem; line-height:1.75; color:rgba(232,234,240,0.75);
+  backdrop-filter:blur(18px); min-width:190px;
+}
+.hud b { color:#4f8cff; font-weight:600; }
+.ctl {
+  position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:3;
+  display:flex; gap:8px; flex-wrap:wrap; justify-content:center; max-width:92%;
+}
+.ctl button {
+  font:inherit; font-size:0.78rem; padding:7px 14px; border-radius:999px; cursor:pointer;
+  color:#e8eaf0; background:rgba(10,10,16,0.72); border:1px solid rgba(255,255,255,0.12);
+  backdrop-filter:blur(18px); transition:all .2s;
+}
+.ctl button:hover { border-color:#4f8cff; color:#4f8cff; }
+.ctl button.on { border-color:#4f8cff; color:#4f8cff; background:rgba(79,140,255,0.14); }
+.hint {
+  position:absolute; top:14px; left:14px; z-index:3;
+  font-size:0.78rem; color:rgba(232,234,240,0.5);
+  background:rgba(10,10,16,0.6); padding:6px 16px; border-radius:999px;
+  border:1px solid rgba(255,255,255,0.08); backdrop-filter:blur(18px); pointer-events:none;
+}
+.grid {
+  position:absolute; bottom:58px; left:50%; transform:translateX(-50%); z-index:2;
+  display:none; grid-template-columns:repeat(4,86px); gap:8px;
+  background:rgba(10,10,16,0.8); border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px; padding:14px; backdrop-filter:blur(18px);
+}
+.grid.show { display:grid; }
+.grid figure { text-align:center; }
+.grid canvas { width:78px; height:64px; border-radius:10px; background:rgba(255,255,255,0.04); cursor:default; }
+.grid figcaption { font-size:0.68rem; color:rgba(232,234,240,0.5); margin-top:4px; font-family:Consolas,monospace; }
+.notes { max-width:960px; margin:24px auto 60px; padding:0 24px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width:760px) { .notes { grid-template-columns:1fr; } }
+.notes section {
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px; padding:20px 22px; backdrop-filter:blur(18px);
+}
+.notes h2 { font-size:1rem; font-weight:600; color:#4f8cff; margin-bottom:12px; }
+.notes li { font-size:0.85rem; line-height:1.75; color:rgba(232,234,240,0.72); margin:8px 0 8px 18px; }
+.notes code { font-family:Consolas,monospace; font-size:0.78rem; color:#7dd3fc; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="../index.html">← 画廊</a>
+  <h1>👀 小形象状态机 — 视线 · 表情 · 眨眼 · 挤歪</h1>
+  <div class="src">源出 <code>wisland/ui/compact.py:26 PetFace</code> · <code>compact.py:320 _paint_pet</code>（spread/tilt/lean）· <code>app.py:283 react("surprise")</code></div>
+</header>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div class="hint">移动鼠标 —— 眼睛跟随；靠近它 → 随机换表情；按住拖 → 挤歪</div>
+  <div class="hud" id="hud"></div>
+  <div class="grid" id="grid"></div>
+  <div class="ctl">
+    <button id="moodBtn">🏷️ 表情九宫格</button>
+    <button id="surpriseBtn">✨ 惊讶（新消息）</button>
+    <button id="tiredBtn">💤 困倦快进 ×40</button>
+    <button id="resetBtn">↺ 复位</button>
+  </div>
+</div>
+
+<div class="notes">
+  <section>
+    <h2>为什么值得借鉴</h2>
+    <ul>
+      <li>吉祥物「活」不靠关键帧多，靠<b>随机性 + 注意力响应</b>：鼠标靠近才随机换表情（且不与上次重复），走开就回默认 —— 交互是奖励，不是打扰。</li>
+      <li>60 秒没人理就<b>困倦</b>（上眼睑降到 0.55）—— 用「被忽视的状态」反向提示用户「我在这儿」，比红点弹窗温柔。</li>
+      <li>新消息 → <b>惊讶</b>给弹簧一个速度脉冲（<code>wide.v += 9</code>）而不是直接设目标值 —— 突发事件用冲量，状态变化用弹簧，两种输入区分对待。</li>
+      <li>视线偏移按<b>归一化比例</b>（look/90px、look/60px 后 clamp ±1）而不是绝对像素 —— 同一套参数放大到主页 2.3 倍仍然自然。</li>
+      <li>按压挤歪是<b>多通道联动</b>：压扁 16%、两眼分开 9px、外倾 14°、整体向没被按一侧倾斜 18° —— 单一输入同时驱动 4 个属性，手感才「肉」。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>实现要点</h2>
+    <ul>
+      <li>7 种表情 <code>MOODS = [happy, wink, love, star, shy, pout, squint]</code>，切换时 <code>random.choice</code> 排除上次（<code>compact.py:57 _pick()</code>）。</li>
+      <li>眨眼周期 <code>2.4 + (sin(t·12.9898)·0.5+0.5)·3.2</code> 秒（伪随机但可复现），时长 <code>0.16 + 0.18·tired</code>（困了眨得慢）。</li>
+      <li>每个特征一个弹簧：视线 k=140/0.8、下眼睑 k=160/0.75、困倦 k=60/1.0（慢）、惊讶 wide k=220/<b>0.45</b>（欠阻尼冲出感）、blush k=120/0.9。</li>
+      <li>眼睛 = 圆角矩形减去「眼睑圆」：开心时下眼睑月牙（圆向上移切出弧线）、困倦时上眼睑矩形下压、嘟嘴时旋转 -24° 斜切小眉头。</li>
+      <li>靠近判定 <code>|rel| &lt; body/2 + 40px</code>；困倦阈值 <code>now - last_attention &gt; 60s</code>（<code>compact.py:95</code>）。</li>
+      <li>按压时 <code>lean = -rel·min(1, amount·1.6)</code>，translate 24px + rotate 18°，两眼各自 <code>rotate(side·tilt)</code>（<code>compact.py:320-330</code>）。</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+"use strict";
+const clamp = (x, lo, hi) => x < lo ? lo : x > hi ? hi : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+
+class Spring {
+  constructor(x, k, ratio, eps = 0.003) {
+    this.x = x; this.v = 0; this.target = x;
+    this.k = k; this.c = 2 * ratio * Math.sqrt(k); this.eps = eps;
+  }
+  to(t) { this.target = t; }
+  snap(x) { this.x = this.target = x; this.v = 0; }
+  get rest() { return Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8; }
+  step(dt) {
+    if (this.rest) { this.x = this.target; this.v = 0; return; }
+    const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = -this.k * (this.x - this.target) - this.c * this.v;
+      this.v += a * h; this.x += this.v * h;
+    }
+  }
+}
+
+const MOODS = ["happy", "wink", "love", "star", "shy", "pout", "squint"];
+const MOOD_CN = { default:"默认", happy:"开心", wink:"眨眼", love:"爱心", star:"星星眼", shy:"害羞", pout:"嘟嘴", squint:"眯眼", surprise:"惊讶" };
+
+// —— PetFace（移植 compact.py:26）——
+class PetFace {
+  constructor() {
+    this.ex = new Spring(0, 140, 0.8, 0.01);     // 视线
+    this.ey = new Spring(0, 140, 0.8, 0.01);
+    this.lh = new Spring(0, 160, 0.75);          // 左下眼睑（开心月牙）
+    this.rh = new Spring(0, 160, 0.75);
+    this.tiredS = new Spring(0, 60, 1.0);        // 上眼睑（困倦）
+    this.wide = new Spring(0, 220, 0.45);        // 放大（惊讶/星星）
+    this.morph = new Spring(0, 200, 0.7);        // 特殊形状（爱心/眯眼/嘟嘴）
+    this.blush = new Spring(0, 120, 0.9);
+    this.mood = "default"; this._lastMood = "";
+    this._near = false;
+    this.blinkAt = performance.now() / 1000 + 2.5;
+    this.lastAttention = performance.now() / 1000;
+    this.surpriseUntil = 0;
+    this.spread = 0; this.tilt = 0;              // 挤压联动
+  }
+  react(kind = "surprise") {
+    this.lastAttention = performance.now() / 1000;
+    if (kind === "surprise") { this.surpriseUntil = this.lastAttention + 1.4; this.wide.v += 9.0; }
+  }
+  pick() {
+    const c = MOODS.filter(m => m !== this._lastMood);
+    this.mood = c[Math.floor(Math.random() * c.length)];
+    this._lastMood = this.mood;
+  }
+  step(dt, look, near, s) {
+    const now = performance.now() / 1000;
+    if (near && !this._near) this.pick();
+    else if (!near && this._near) this.mood = "default";
+    this._near = near;
+    if (near) this.lastAttention = now;
+    let m = near ? this.mood : "default";
+    if (now < this.surpriseUntil) m = "surprise";
+    this._m = m;
+
+    let tx, ty;
+    if (!near && Math.abs(look.x) > 420 * s) {    // 离得远：东张西望
+      tx = Math.sin(now * 0.55) * 0.8 + Math.sin(now * 1.7) * 0.15;
+      ty = Math.sin(now * 0.37) * 0.35;
+    } else {
+      tx = clamp(look.x / (90 * s), -1, 1);
+      ty = clamp(look.y / (60 * s), -1, 1);
+    }
+    if (m === "shy") { tx = tx * 0.3 + 0.5; ty = 0.75; }   // 害羞看斜下方
+    this.ex.to(tx); this.ey.to(ty);
+    const lhMap = { happy:1, laugh:1, shy:0.55, wink:1 };
+    const rhMap = { happy:1, laugh:1, shy:0.55, wink:1 };
+    this.lh.to(m === "wink" ? 0 : (lhMap[m] || 0));
+    this.rh.to(rhMap[m] || 0);
+    this.tiredS.to((now - this.lastAttention > 60 && m === "default") ? 0.55 : 0);
+    this.wide.to({ star:0.3, surprise:0.35 }[m] || 0);
+    this.morph.to(["love","squint","pout"].includes(m) ? 1 : 0);
+    this.blush.to({ shy:1, love:0.8, happy:0.5, laugh:0.6, wink:0.5 }[m] || 0);
+    for (const sp of [this.ex,this.ey,this.lh,this.rh,this.tiredS,this.wide,this.morph,this.blush]) sp.step(dt);
+
+    // 眨眼
+    const dur = 0.16 + 0.18 * this.tiredS.x;
+    if (now >= this.blinkAt + dur) {
+      const gap = 2.4 + (Math.sin(now * 12.9898) * 0.5 + 0.5) * 3.2;
+      this.blinkAt = now + gap * (this.tiredS.x > 0.3 ? 1.6 : 1.0);
+    }
+    let b = 0;
+    if (this.blinkAt <= now && now < this.blinkAt + dur && ["default","pout","shy","star"].includes(m))
+      b = Math.sin((now - this.blinkAt) / dur * Math.PI);
+    return b;
+  }
+  // —— 绘制（简化复刻 paint()）——
+  paint(p, cx, cy, s, a, blink) {
+    const m = this._m || "default";
+    const now = performance.now() / 1000;
+    const tired = clamp(this.tiredS.x, 0, 1);
+    const wide = clamp(this.wide.x, -0.3, 1);
+    const morph = clamp(this.morph.x, 0, 1);
+    const lx = this.ex.x, ly = this.ey.x;
+    const bounce = m === "laugh" ? Math.sin(now * 16) * 1.6 * s : 0;
+    const baseW = 11 * s, baseH = 15 * s, gap = 15 * s;
+    const eyeCol = `rgba(232,234,240,${0.95 * a})`;
+    const pink = "#ff5c8a";
+    const centers = [];
+
+    for (const side of [-1, 1]) {
+      p.save();
+      const ex0 = cx + side * (gap / 2 + baseW / 2 + this.spread * s / 2) + lx * 5 * s;
+      const ey0 = cy + ly * 3 * s;
+      if (Math.abs(this.tilt) > 0.05) {           // 挤压外倾
+        p.translate(ex0, ey0); p.rotate(side * this.tilt * Math.PI / 180); p.translate(-ex0, -ey0);
+      }
+      const hap = clamp(side < 0 ? this.lh.x : this.rh.x, 0, 1);
+      const curious = 1 + 0.22 * Math.max(0, lx * side);   // 好奇时那只眼变高
+      const w = baseW * (1 + 0.12 * wide) * (1 + 0.25 * blink);
+      const h = baseH * curious * (1 + 0.18 * wide) * (1 - 0.88 * blink);
+      const ex = cx + side * (gap / 2 + baseW / 2 + this.spread * s / 2) + lx * 5 * s;
+      const ey = cy + ly * 3 * s + bounce;
+      centers.push([ex, ey]);
+
+      // 光晕
+      const glow = p.createRadialGradient(ex, ey, 0, ex, ey, Math.max(w, h) * 0.85);
+      glow.addColorStop(0, m === "love" ? `rgba(255,92,138,${0.33 * a})` : `rgba(232,234,240,${0.33 * a})`);
+      glow.addColorStop(1, "rgba(232,234,240,0)");
+      p.fillStyle = glow;
+      p.beginPath(); p.ellipse(ex, ey, w * 0.95, h * 0.75 + 3 * s, 0, 0, Math.PI * 2); p.fill();
+
+      // 爱心
+      if (m === "love" && morph > 0.05) {
+        const pulse = 1 + 0.08 * Math.sin(now * 7);
+        const sz = 15 * s * pulse * (0.6 + 0.4 * morph);
+        p.fillStyle = `rgba(255,92,138,${a * morph})`;
+        p.beginPath();
+        p.moveTo(ex, ey + sz * 0.42);
+        p.bezierCurveTo(ex - sz * 0.9, ey - sz * 0.05, ex - sz * 0.45, ey - sz * 0.75, ex, ey - sz * 0.28);
+        p.bezierCurveTo(ex + sz * 0.45, ey - sz * 0.75, ex + sz * 0.9, ey - sz * 0.05, ex, ey + sz * 0.42);
+        p.closePath(); p.fill();
+        p.restore(); continue;
+      }
+      // 眯眼 ><
+      if (m === "squint" && morph > 0.05) {
+        p.strokeStyle = eyeCol; p.lineWidth = 2.6 * s; p.lineCap = "round"; p.lineJoin = "round";
+        const k = 5.5 * s * morph, d = -side;
+        p.beginPath();
+        p.moveTo(ex - d * k, ey - k); p.lineTo(ex + d * k, ey); p.lineTo(ex - d * k, ey + k);
+        p.stroke();
+        p.restore(); continue;
+      }
+      // 眼睛主体：圆角矩形
+      const h2 = Math.max(1.6 * s, h);
+      const rad = Math.min(w, h2) * 0.42;
+      p.beginPath();
+      roundRect(p, ex - w / 2, ey - h2 / 2, w, h2, rad);
+      // 困倦：上眼睑下压
+      if (tired > 0.01) {
+        p.save(); p.clip("evenodd");
+        p.fillStyle = "#0d1420";
+        p.fillRect(ex - w / 2 - 2, ey - h2 / 2 - 2, w + 4, 2 + h2 * 0.5 * tired);
+        p.restore();
+        p.beginPath(); roundRect(p, ex - w / 2, ey - h2 / 2, w, h2, rad);
+      }
+      // 嘟嘴：内侧上眼角斜切小眉头
+      if (m === "pout" && morph > 0.05) {
+        p.save(); p.clip("evenodd");
+        p.fillStyle = "#0d1420";
+        p.save();
+        p.translate(ex - side * w * 0.1, ey - h2 / 2 + h2 * 0.32 * morph);
+        p.rotate(side * -24 * Math.PI / 180 * morph);
+        p.fillRect(-w, -h2, w * 2.2, h2 * 1.0);
+        p.restore(); p.restore();
+        p.beginPath(); roundRect(p, ex - w / 2, ey - h2 / 2, w, h2, rad);
+      }
+      // 开心：下眼睑月牙（圆从下方切）
+      if (hap > 0.01) {
+        p.save(); p.clip("evenodd");
+        const cutR = w * 0.9;
+        p.fillStyle = "#0d1420";
+        p.beginPath();
+        p.arc(ex, ey + h2 / 2 + cutR - h2 * 0.62 * hap, cutR, 0, Math.PI * 2);
+        p.fill();
+        p.restore();
+        p.beginPath(); roundRect(p, ex - w / 2, ey - h2 / 2, w, h2, rad);
+      }
+      p.fillStyle = eyeCol; p.fill();
+      // 星星眼闪片
+      if (m === "star" && h2 > 6 * s) {
+        p.fillStyle = `rgba(30,30,40,${0.85 * a})`;
+        sparkle(p, ex + 1.4 * s, ey - 2.2 * s, 3.4 * s);
+        sparkle(p, ex - 2.2 * s, ey + 3.0 * s, 1.6 * s);
+      }
+      p.restore();
+    }
+    // 腮红
+    const bl = clamp(this.blush.x, 0, 1);
+    if (bl > 0.02) {
+      p.fillStyle = `rgba(255,124,162,${0.59 * bl * a})`;
+      centers.forEach(([ex, ey], i) => {
+        const side = i === 0 ? -1 : 1;
+        p.beginPath();
+        p.ellipse(ex + side * 7.5 * s, ey + baseH * 0.55, 4.4 * s, 2.4 * s, 0, 0, Math.PI * 2);
+        p.fill();
+      });
+    }
+    // 嘴
+    const mx = cx + lx * 5 * s, my = cy + baseH * 0.66 + ly * 3 * s + bounce;
+    p.strokeStyle = `rgba(232,234,240,${0.9 * a})`;
+    p.lineWidth = 1.8 * s; p.lineCap = "round";
+    if (["happy","wink","love","shy"].includes(m)) {
+      p.beginPath(); p.moveTo(mx - 3.5 * s, my); p.quadraticCurveTo(mx, my + 4.2 * s, mx + 3.5 * s, my); p.stroke();
+    } else if (m === "laugh") {
+      p.fillStyle = `rgba(232,234,240,${0.9 * a})`;
+      p.beginPath(); p.moveTo(mx - 4.5 * s, my - 0.5 * s);
+      p.quadraticCurveTo(mx, my + 8.5 * s, mx + 4.5 * s, my - 0.5 * s);
+      p.closePath(); p.fill();
+    } else if (["star","surprise"].includes(m)) {
+      p.beginPath(); p.ellipse(mx, my + 1.5 * s, 2.4 * s, 2.8 * s, 0, 0, Math.PI * 2); p.stroke();
+    } else if (m === "pout") {
+      p.beginPath(); p.moveTo(mx - 3 * s, my + 1.5 * s); p.lineTo(mx + 3 * s, my + 1.5 * s); p.stroke();
+    } else if (m === "squint") {
+      p.beginPath(); p.moveTo(mx - 3 * s, my); p.quadraticCurveTo(mx, my + 3.5 * s, mx + 3 * s, my); p.stroke();
+    }
+  }
+}
+function roundRect(p, x, y, w, h, r) {
+  p.moveTo(x + r, y);
+  p.arcTo(x + w, y, x + w, y + h, r);
+  p.arcTo(x + w, y + h, x, y + h, r);
+  p.arcTo(x, y + h, x, y, r);
+  p.arcTo(x, y, x + w, y, r);
+  p.closePath();
+}
+function sparkle(p, cx, cy, r) {
+  p.beginPath();
+  p.moveTo(cx, cy - r);
+  p.quadraticCurveTo(cx, cy, cx + r, cy);
+  p.quadraticCurveTo(cx, cy, cx, cy + r);
+  p.quadraticCurveTo(cx, cy, cx - r, cy);
+  p.quadraticCurveTo(cx, cy, cx, cy - r);
+  p.closePath(); p.fill();
+}
+
+// —— 演示 ——
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const hud = document.getElementById("hud");
+const grid = document.getElementById("grid");
+let W = 0, H = 0, DPR = 1;
+const face = new PetFace();
+let press = 0, pressTarget = 0, pressPt = null;   // 按压 amount（wisland poke 弹簧 k=380/0.55）
+const pressS = new Spring(0, 380, 0.55, 0.004);
+let tiredFast = false;
+
+function resize() {
+  const r = cv.parentElement.getBoundingClientRect();
+  DPR = window.devicePixelRatio || 1;
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener("resize", resize);
+
+let mouse = { x: -999, y: -999 };
+cv.addEventListener("pointermove", e => {
+  const r = cv.getBoundingClientRect();
+  mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+  if (pressTarget > 0 && pressPt) { pressPt.x = mouse.x; pressPt.y = mouse.y; }
+});
+cv.addEventListener("pointerdown", e => {
+  const r = cv.getBoundingClientRect();
+  const px = e.clientX - r.left, py = e.clientY - r.top;
+  const cx = W / 2, cy = H / 2 - 8;
+  const nx = (px - cx) / 130, ny = (py - cy) / 70;
+  const depth = 1 - Math.min(1, Math.hypot(nx, ny));      // 越靠中心压得越狠
+  pressTarget = Math.pow(depth, 1.4);
+  pressPt = { x: px, y: py };
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointerup", () => { pressTarget = 0; pressPt = null; });
+cv.addEventListener("pointercancel", () => { pressTarget = 0; pressPt = null; });
+
+document.getElementById("surpriseBtn").onclick = () => face.react("surprise");
+document.getElementById("tiredBtn").onclick = e => {
+  tiredFast = !tiredFast;
+  e.target.classList.toggle("on", tiredFast);
+  if (tiredFast) face.lastAttention = performance.now() / 1000 - 61;
+  else face.lastAttention = performance.now() / 1000;
+};
+document.getElementById("resetBtn").onclick = () => {
+  face.mood = "default"; face._lastMood = "";
+  face.lastAttention = performance.now() / 1000;
+  face.surpriseUntil = 0; tiredFast = false;
+  document.getElementById("tiredBtn").classList.remove("on");
+  pressTarget = 0; pressPt = null;
+};
+document.getElementById("moodBtn").onclick = e => {
+  grid.classList.toggle("show");
+  e.target.classList.toggle("on", grid.classList.contains("show"));
+  if (grid.classList.contains("show") && !grid.dataset.built) {
+    grid.dataset.built = "1";
+    for (const m of ["default", ...MOODS, "surprise"]) {
+      const fig = document.createElement("figure");
+      const c = document.createElement("canvas");
+      c.width = 156; c.height = 128;
+      fig.appendChild(c);
+      const cap = document.createElement("figcaption");
+      cap.textContent = m;
+      fig.appendChild(cap);
+      grid.appendChild(fig);
+      const g = c.getContext("2d");
+      const f = new PetFace();
+      f.mood = m; f._m = m;
+      f.morph.x = f.morph.target = ["love","squint","pout"].includes(m) ? 1 : 0;
+      f.blush.x = f.blush.target = { shy:1, love:0.8, happy:0.5 }[m] || 0;
+      f.wide.x = f.wide.target = { star:0.3, surprise:0.35 }[m] || 0;
+      f.lh.x = f.lh.target = f.rh.x = f.rh.target = ["happy"].includes(m) ? 1 : 0;
+      f.tiredS.x = f.tiredS.target = 0;
+      f.ex.x = f.ex.target = 0.25; f.ey.x = f.ey.target = 0.1;
+      g.clearRect(0, 0, 156, 128);
+      f.paint(g, 78, 64, 1.6, 1, 0);
+    }
+  }
+};
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, Math.max(1 / 240, (now - last) / 1000));
+  last = now;
+
+  const cx = W / 2, cy = H / 2 - 8;
+  const rect = { x: cx - 130, y: cy - 70, w: 260, h: 140 };
+  const near = mouse.x > rect.x - 24 && mouse.x < rect.x + rect.w + 24 &&
+               mouse.y > rect.y - 24 && mouse.y < rect.y + rect.h + 24;
+  const look = { x: mouse.x - cx, y: mouse.y - cy };
+  const blink = face.step(dt, look, near, 1);
+
+  // 按压弹簧 + 平滑位置（wisland _poke_sm lerp 0.3）
+  pressS.to(pressTarget); pressS.step(dt);
+  press = pressS.x;
+  if (pressPt) {
+    if (!frame._ps) frame._ps = { ...pressPt };
+    frame._ps.x += (pressPt.x - frame._ps.x) * 0.3;
+    frame._ps.y += (pressPt.y - frame._ps.y) * 0.3;
+  } else frame._ps = null;
+
+  // 挤压联动（wisland compact.py _paint_pet）
+  const rel = frame._ps ? clamp((frame._ps.x - cx) / 130, -1, 1) : 0;
+  const amount = clamp(press, 0, 1.2);
+  const sideW = Math.abs(rel);
+  const lean = -rel * Math.min(1, amount * 1.6);
+  face.spread = amount * (1 - sideW) * 9;
+  face.tilt = amount * (1 - sideW) * 14;
+  const squashX = 1 + 0.05 * amount, squashY = 1 - 0.16 * amount;
+
+  ctx.clearRect(0, 0, W, H);
+  // 氛围光（靠近时亮起）
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 260);
+  glow.addColorStop(0, near ? "rgba(79,140,255,0.10)" : "rgba(79,140,255,0.04)");
+  glow.addColorStop(1, "rgba(79,140,255,0)");
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(cx + lean * 24, cy);
+  ctx.rotate(lean * 18 * Math.PI / 180);
+  ctx.scale(squashX, squashY);
+  ctx.translate(-cx, -cy);
+  face.paint(ctx, cx, cy, 2.3, 1, blink);
+  ctx.restore();
+
+  const idle = (performance.now() / 1000 - face.lastAttention);
+  hud.innerHTML =
+    `<b>mood</b>&nbsp;&nbsp;&nbsp; ${MOOD_CN[face._m || "default"]}<br>` +
+    `<b>near</b>&nbsp;&nbsp;&nbsp;&nbsp; <span style="color:${near ? "#34d399" : "#fb923c"}">${near ? "yes" : "no"}</span><br>` +
+    `<b>gaze</b>&nbsp;&nbsp;&nbsp;&nbsp; (${face.ex.x.toFixed(2)}, ${face.ey.x.toFixed(2)})<br>` +
+    `<b>press</b>&nbsp;&nbsp;&nbsp; ${amount.toFixed(2)} · lean ${lean.toFixed(2)}<br>` +
+    `<b>idle</b>&nbsp;&nbsp;&nbsp;&nbsp; ${idle.toFixed(0)}s${tiredFast ? " ×40" : ""}`;
+
+  requestAnimationFrame(frame);
+}
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

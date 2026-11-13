@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🌊 常态呼吸 · AA-Design</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a10;
+    color: #e8eaf0;
+    font-family: "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif;
+    min-height: 100vh;
+    padding: 32px 24px 56px;
+  }
+  header { max-width: 1080px; margin: 0 auto 24px; }
+  header a.back {
+    display: inline-block;
+    color: rgba(232,234,240,0.55);
+    text-decoration: none;
+    font-size: 0.875rem;
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: color .15s, border-color .15s;
+  }
+  header a.back:hover { color: #e8eaf0; border-color: rgba(255,255,255,0.24); }
+  h1 { font-size: 1.5rem; font-weight: 700; margin: 14px 0 6px; }
+  .src {
+    font-size: 0.78rem;
+    color: rgba(232,234,240,0.55);
+    line-height: 1.7;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    word-break: break-all;
+  }
+  .src b { color: #4f8cff; font-weight: 600; }
+
+  /* ================= 舞台 ================= */
+  #stage {
+    max-width: 1080px;
+    margin: 0 auto;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .bar {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px 20px;
+    font-size: 0.82rem;
+  }
+  .btn {
+    font: inherit;
+    font-size: 0.85rem;
+    color: #e8eaf0;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .btn:hover { border-color: rgba(79,140,255,0.65); background: rgba(79,140,255,0.12); }
+  .slider { display: inline-flex; align-items: center; gap: 8px; color: rgba(232,234,240,0.55); }
+  .slider input[type="range"] { accent-color: #4f8cff; width: 150px; }
+  .slider b { color: #e8eaf0; font-family: ui-monospace, Consolas, monospace; font-weight: 600; }
+  .ro { color: rgba(232,234,240,0.55); }
+  .ro b {
+    color: #4f8cff;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .badge {
+    font-size: 0.78rem;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(232,234,240,0.55);
+    background: rgba(255,255,255,0.04);
+    transition: color .2s, border-color .2s, background .2s;
+    font-variant-numeric: tabular-nums;
+  }
+  .badge.busy {
+    color: #4f8cff;
+    border-color: rgba(79,140,255,0.6);
+    background: rgba(79,140,255,0.12);
+  }
+  #cv { display: block; border-radius: 10px; }
+  .hint { font-size: 0.75rem; color: rgba(232,234,240,0.4); }
+
+  /* ================= 说明 ================= */
+  .notes { max-width: 1080px; margin: 34px auto 0; }
+  .notes h2 { font-size: 1rem; font-weight: 600; color: #4f8cff; margin: 26px 0 10px; }
+  .notes ul { list-style: none; }
+  .notes li {
+    position: relative;
+    padding: 7px 0 7px 18px;
+    color: rgba(232,234,240,0.55);
+    line-height: 1.75;
+    font-size: 0.9rem;
+  }
+  .notes li::before {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 15px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4f8cff;
+    opacity: 0.75;
+  }
+  .notes li b { color: #e8eaf0; font-weight: 600; }
+  .notes code {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color: #4f8cff;
+    background: rgba(79,140,255,0.1);
+    border-radius: 6px;
+    padding: 1px 5px;
+    font-size: 0.82em;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="../index.html">← 画廊</a>
+  <h1>🌊 常态呼吸</h1>
+  <div class="src">
+    wisland/ui/island.py:757 <b>_update_geometry()</b> 圆角呼吸 ·
+    wisland/ui/island.py:1004 <b>_paint_rest()</b> 流光相位 sin(t·0.55) ·
+    wisland/ui/island.py:1009 <b>_paint_rest()</b> 径向渐变流光 ·
+    wisland/ui/island.py:816 <b>wave()</b> 音乐律动波 ·
+    wisland/ui/island.py:651 <b>_tick()</b> 30/60fps 分级 ·
+    wisland/ui/anim.py:32 <b>Spring.step()</b> 240Hz 子步进
+  </div>
+</header>
+
+<div id="stage">
+  <div class="bar">
+    <button class="btn" id="playBtn" type="button">▶ 播放音乐</button>
+    <label class="slider">音乐峰值 peak
+      <input id="peak" type="range" min="0" max="1" step="0.01" value="0.4">
+      <b id="peakVal">0.40</b>
+    </label>
+    <span class="ro">① fillet <b id="fVal">13.00</b></span>
+    <span class="ro">② 流光 <b id="gVal">0.00</b></span>
+    <span class="ro">③ pk <b id="pkVal">0.00</b></span>
+    <span class="badge" id="fpsBadge">空闲 · 30fps</span>
+    <span class="ro">实测 <b id="fpsReal">—</b></span>
+  </div>
+  <canvas id="cv" width="760" height="400"></canvas>
+  <p class="hint">胶囊吸在演示区顶边：圆角呼吸 + 边缘流光常驻；点击胶囊本体可播放 / 暂停音乐律动波（远离屏幕边的半边才会起伏）</p>
+</div>
+
+<section class="notes">
+  <h2>为什么值得借鉴</h2>
+  <ul>
+    <li><b>收起态也持续跑微动画。</b>wisland <code>_needs_frames()</code> 原注释：「收起态：常态动画（圆角呼吸 + 边缘流光）持续运行」——挂在屏幕边缘的组件靠这点"活气"证明自己没卡死、没失去响应，用户余光即可确认状态，不需要任何文字提示。</li>
+    <li><b>呼吸幅度只有 ±7%</b>（<code>FILLET = 13.0</code> → 12.09~13.91px）：近看有生命感、远看几乎静止。环境型挂件的动效是"氛围"不是"通知"，绝不能抢注意力。</li>
+    <li><b>流光是可发现性线索。</b>中心 alpha=80、笔宽 1px 的白色微光以 <code>sin(t·0.55)</code>（周期约 11.4 秒）沿边缘缓慢游走，含蓄地暗示"这条边可以交互"，比常亮的按钮或角标克制得多。</li>
+    <li><b>音乐律动只动"远离屏幕边"的半边。</b>法向权重 <code>wgt &lt; 0.3</code> 的点完全不动——贴边侧永远锚定，律动发生在朝向内容的一侧，锚点稳、方向语义清晰。</li>
+    <li><b>30/60fps 分级。</b>只有常态动画时按空闲 33ms/帧（≈30fps）跑；音乐律动 / 表情 / 提醒等 busy 状态才切到 16ms/帧（≈60fps）——常驻动画的成本被压到最低，笔记本续航友好。</li>
+  </ul>
+
+  <h2>实现要点</h2>
+  <ul>
+    <li><b>圆角呼吸是一行相位公式：</b><code>fillet = FILLET(13.0) × (1 + 0.07·sin(t·1.7))</code>（island.py:755-757）；形变速度还会额外撑开液面 <code>+ min(12, (|v_sw|+|v_sh|)·0.012)</code>（island.py:758）。本页把呼吸后的 fillet 画成高亮内凹圆角 + 虚线半径辅助线，实时读数可看到 12.09~13.91 的摆动。</li>
+    <li><b>流光 = 沿轮廓描边的径向渐变：</b><code>QRadialGradient(pt, max(60, bb.width×0.35))</code>（本例 440×0.35 = 154px），中心白色 alpha=80（暗色主题 55）、外圈 alpha=0，1.0px 笔宽 <code>strokePath</code>（island.py:1009-1012）；光斑位置 <code>x = left + width × (sin(t·0.55)×0.5+0.5)</code>、y 取 bbox 远边（island.py:1004-1006）。</li>
+    <li><b>律动波公式照抄：</b><code>pk = clamp(peak_fn()×1.5, 0, 1)</code>（island.py:804），逐点法向位移 <code>pk·2.4·wgt²·sin(u·0.09 − t·7)</code>，<code>wgt = 法线·远边方向</code>，<code>wgt &lt; 0.3</code> 直接跳过（island.py:810-816）。本页按 island.py:785 的 <code>body_points(…, 4.0)</code> 以 4px 步长采样轮廓（shape.py:75），位移后用 poly_path 的 Catmull-Rom→三次贝塞尔平滑闭合（shape.py:142），u 取屏幕水平坐标 px（island.py:815）。</li>
+    <li><b>贴边内凹圆角复刻 neck_path()（shape.py:161）</b>的单段三次贝塞尔：起点在屏幕边上 <code>(c − (half + fillet), 0)</code>，控制点用四分之一圆弧系数 <code>K = 0.5523</code>（shape.py:23），收进本体侧壁——即表面张力的 meniscus；本页左右两角逐点复刻该曲线。</li>
+    <li><b>fps 分级实现：</b>anchored + 弹簧静止 + 收起时 <code>setInterval(16 if compact.busy() else 33)</code>，注释原话「表情 / 音乐律动 / 提醒时 60fps，空闲（只有圆角呼吸）时 30fps」（island.py:649-651）；<code>_tick()</code> 把 dt 钳在 <code>[1/240, 1/30]</code>（island.py:556）。本页 rAF 按同样的 16/33ms 门限出帧，badge 实时显示当前分级与实测帧率。</li>
+    <li><b>播放开关的 pk 过渡用照抄 anim.py 的阻尼弹簧：</b><code>c = 2·ratio·√k</code>，取 k=300、ratio=0.62（island.py:239-240 Spring(cw,300,0.62,0.2)、anim.py:21），积分按 240Hz 子步进 <code>n = ceil(dt/(1/240))</code>（anim.py:32 <code>Spring.step()</code>）——帧率在 30/60 之间切换也不改变手感（源码里 pk 来自连续音频峰值 peak_fn、天然平滑，弹簧只在本演示的开关/滑杆处做平滑过渡）。</li>
+  </ul>
+</section>
+
+<script>
+'use strict';
+(function () {
+  /* ---------- 常量：与 wisland 源码逐行核对 ---------- */
+  const K = 0.5523, K1 = 1 - K;      // shape.py:23 四分之一圆弧贝塞尔系数
+  const FILLET = 13.0;               // island.py:38 FILLET = 13.0
+  const W = 760, CH = 400;           // 画布逻辑尺寸
+  const CAP_W = 440, CAP_H = 64;     // 收起态胶囊
+  const RB = Math.min(CAP_H / 2, CAP_W / 2, 30);  // island.py:751 base_r = min(h/2, w/2, 30)
+  const L = (W - CAP_W) / 2, R = L + CAP_W;
+  const STEP = 4.0;                  // island.py:785 body_points(..., 4.0)
+  const FONT = '11px "HarmonyOS Sans","MiSans","Segoe UI Variable Text","Microsoft YaHei UI",system-ui,sans-serif';
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  cv.width = W * dpr;
+  cv.height = CH * dpr;
+  cv.style.width = W + 'px';
+  cv.style.height = CH + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const btn = document.getElementById('playBtn');
+  const peakEl = document.getElementById('peak');
+  const peakVal = document.getElementById('peakVal');
+  const fVal = document.getElementById('fVal');
+  const gVal = document.getElementById('gVal');
+  const pkVal = document.getElementById('pkVal');
+  const badge = document.getElementById('fpsBadge');
+  const fpsReal = document.getElementById('fpsReal');
+
+  let playing = false;
+  let hover = false;
+  const t0 = performance.now();
+
+  /* ---------- 阻尼弹簧：照抄 wisland ui/anim.py Spring ---------- */
+  // c = 2·ratio·√k（anim.py:21）；step 按 240Hz 子步进（anim.py:32）
+  class Spring {
+    constructor(v, k, ratio, eps) {
+      this.x = v; this.v = 0; this.target = v;
+      this.k = k; this.c = 2 * ratio * Math.sqrt(k); this.eps = eps;
+    }
+    step(dt) {
+      if (Math.abs(this.x - this.target) < this.eps && Math.abs(this.v) < this.eps * 8) {
+        this.x = this.target; this.v = 0; return;
+      }
+      const n = Math.max(1, Math.ceil(dt / (1 / 240)));
+      const h = dt / n;
+      for (let i = 0; i < n; i++) {
+        const a = -this.k * (this.x - this.target) - this.c * this.v;
+        this.v += a * h;
+        this.x += this.v * h;
+      }
+    }
+  }
+  // island.py:239 Spring(cw, 300, 0.62, 0.2)；演示里 eps 收紧以精确停在 pk 目标
+  const pkSpring = new Spring(0, 300, 0.62, 0.004);
+
+  function cub(p0, p1, p2, p3, s) {
+    const m = 1 - s;
+    return m * m * m * p0 + 3 * m * m * s * p1 + 3 * m * s * s * p2 + s * s * s * p3;
+  }
+
+  /* ---------- 贴边内凹 fillet：复刻 shape.py:161 neck_path() 的单段贝塞尔 ---------- */
+  function filletPts(f, side) {
+    let x0, x1, x2, x3, y0, y1, y2, y3;
+    if (side < 0) {           // 左角：(L-f, 0) -> (L, f)
+      x0 = L - f; x1 = L - f * K1; x2 = L; x3 = L;
+      y0 = 0; y1 = f * K1; y2 = f * K1; y3 = f;
+    } else {                  // 右角：(R, f) -> (R+f, 0)
+      x0 = R; x1 = R; x2 = R + f * K1; x3 = R + f;
+      y0 = f; y1 = f * K1; y2 = f * K1; y3 = 0;
+    }
+    const n = Math.max(8, Math.round(f * 1.6));
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+      const s = i / n;
+      out.push({ x: cub(x0, x1, x2, x3, s), y: cub(y0, y1, y2, y3, s) });
+    }
+    return out;
+  }
+
+  /* ---------- 轮廓采样（body_points 同款 4px 步长） ---------- */
+  function buildPts(f) {
+    const pts = [];
+    const add = (x, y, nx, ny, cw) => pts.push({ x: x, y: y, nx: nx, ny: ny, cw: cw });
+    const bot = CAP_H - RB;
+
+    // 1) 顶边（吸附在屏幕边上）——法线朝上，wgt=0 不参与律动
+    for (let x = 0; x < L - f - 1; x += STEP) add(x, 0, 0, -1, false);
+    // 2) 左内凹 fillet（液面颈，不参与律动）
+    const lf = filletPts(f, -1);
+    for (let i = 0; i < lf.length; i++) add(lf[i].x, lf[i].y, -1, 0, false);
+    // 3) 左侧壁（法线水平，wgt=0）
+    for (let y = f + STEP; y < bot - 2; y += STEP) add(L, y, -1, 0, true);
+    add(L, bot, -1, 0, true);
+    // 4) 左下圆角（法线放射，外侧下半参与律动）
+    const AS = 12;
+    for (let i = 1; i <= AS; i++) {
+      const a = Math.PI - (Math.PI / 2) * (i / AS);
+      add(L + RB + RB * Math.cos(a), bot + RB * Math.sin(a), Math.cos(a), Math.sin(a), true);
+    }
+    // 5) 远边（律动主场）：u = px，wgt = 1
+    for (let x = L + RB + STEP; x < R - RB - 1; x += STEP) add(x, CAP_H, 0, 1, true);
+    add(R - RB, CAP_H, 0, 1, true);
+    // 6) 右下圆角
+    for (let i = 1; i <= AS; i++) {
+      const a = (Math.PI / 2) - (Math.PI / 2) * (i / AS);
+      add((R - RB) + RB * Math.cos(a), bot + RB * Math.sin(a), Math.cos(a), Math.sin(a), true);
+    }
+    // 7) 右侧壁
+    for (let y = CAP_H - RB - STEP; y > f + 2; y -= STEP) add(R, y, 1, 0, true);
+    add(R, f, 1, 0, true);
+    // 8) 右内凹 fillet
+    const rf = filletPts(f, 1);
+    for (let i = 0; i < rf.length; i++) add(rf[i].x, rf[i].y, 1, 0, false);
+    // 9) 顶边右段
+    let x = R + f + STEP;
+    for (; x < W - 2; x += STEP) add(x, 0, 0, -1, false);
+    add(W, 0, 0, -1, false);
+    return pts;
+  }
+
+  /* ---------- 律动波：island.py:810-816 wave() ---------- */
+  function applyWave(pts, pk, t) {
+    if (pk <= 0.0005) return;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      if (!p.cw) continue;
+      const wgt = Math.max(0, p.ny);          // far = (0, 1)（远离屏幕边的方向）
+      if (wgt < 0.3) continue;                // island.py:813
+      const d = pk * 2.4 * wgt * wgt * Math.sin(p.x * 0.09 - t * 7.0);  // island.py:816
+      p.x += p.nx * d;
+      p.y += p.ny * d;
+    }
+  }
+
+  /* ---------- poly_path()：Catmull-Rom 转三次贝塞尔（shape.py:142） ---------- */
+  function toPath(pts) {
+    const p = new Path2D();
+    const n = pts.length;
+    p.moveTo(pts[0].x, pts[0].y);
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      p.bezierCurveTo(
+        p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6,
+        p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6,
+        p2.x, p2.y
+      );
+    }
+    p.closePath();
+    return p;
+  }
+
+  function filletPath(f, side) {
+    const seg = filletPts(f, side);
+    const p = new Path2D();
+    p.moveTo(seg[0].x, seg[0].y);
+    for (let i = 1; i < seg.length; i++) p.lineTo(seg[i].x, seg[i].y);
+    return p;
+  }
+
+  /* ---------- 渲染 ---------- */
+  function render(now, dt) {
+    const t = (now - t0) / 1000;
+    const peak = parseFloat(peakEl.value);
+
+    // pk 目标：island.py:804 clamp(peak_fn()×1.5, 0, 1)；暂停时归 0
+    pkSpring.target = playing ? Math.min(1, Math.max(0, peak * 1.5)) : 0;
+    pkSpring.step(dt);
+    const pk = pkSpring.x;
+
+    // ① 圆角呼吸：island.py:757
+    const f = FILLET * (1 + 0.07 * Math.sin(t * 1.7));
+    // ② 流光相位：island.py:1004
+    const ph = Math.sin(t * 0.55) * 0.5 + 0.5;
+
+    ctx.clearRect(0, 0, W, CH);
+
+    // 屏幕边缘
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0.5);
+    ctx.lineTo(W, 0.5);
+    ctx.stroke();
+
+    // 胶囊本体（含呼吸后的贴边 fillet）
+    const pts = buildPts(f);
+    applyWave(pts, pk, t);
+    const path = toPath(pts);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fill(path);
+    ctx.strokeStyle = hover ? 'rgba(255,255,255,0.26)' : 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    ctx.stroke(path);
+
+    // ② 边缘流光：径向渐变描边（island.py:1009-1012）
+    const gx = L + CAP_W * ph, gy = CAP_H;
+    const rad = Math.max(60, CAP_W * 0.35);
+    const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, rad);
+    grad.addColorStop(0, 'rgba(255,255,255,0.314)');   // alpha 80 / 255
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1;
+    ctx.stroke(path);
+
+    // fillet 可视化：高亮内凹圆角 + 虚线半径辅助线
+    ctx.strokeStyle = 'rgba(79,140,255,0.95)';
+    ctx.lineWidth = 2;
+    ctx.stroke(filletPath(f, -1));
+    ctx.stroke(filletPath(f, 1));
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = 'rgba(79,140,255,0.6)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(L, 0.5); ctx.lineTo(L - f, 0.5);
+    ctx.moveTo(L, 0.5); ctx.lineTo(L, f);
+    ctx.moveTo(R, 0.5); ctx.lineTo(R + f, 0.5);
+    ctx.moveTo(R, 0.5); ctx.lineTo(R, f);
+    ctx.stroke();
+    ctx.restore();
+
+    // 标注
+    ctx.font = FONT;
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(232,234,240,0.55)';
+    ctx.fillText('屏幕边缘 · edge = top（吸附贴边）', 10, CH - 12);
+    ctx.fillStyle = 'rgba(232,234,240,0.4)';
+    ctx.textAlign = 'right';
+    ctx.fillText('点击胶囊切换播放', W - 10, CH - 12);
+    ctx.fillStyle = '#4f8cff';
+    ctx.fillText('fillet ' + f.toFixed(2), L - f - 8, 34);
+
+    // 读数
+    fVal.textContent = f.toFixed(2);
+    gVal.textContent = ph.toFixed(2);
+    pkVal.textContent = pk.toFixed(2);
+    peakVal.textContent = peak.toFixed(2);
+  }
+
+  /* ---------- rAF + 16/33ms 出帧门限（island.py:649-651 分级） ---------- */
+  let lastRender = 0, fCount = 0, fMark = performance.now(), fps = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const interval = playing ? 16 : 33;   // busy 60fps / 空闲 30fps
+    if (now - lastRender < interval - 1.5) return;
+    // island.py:556 dt = min(1/30, max(1/240, dt))
+    const dt = Math.min(1 / 30, Math.max(1 / 240, (now - lastRender) / 1000));
+    lastRender = now;
+    render(now, dt);
+    fCount++;
+    if (now - fMark >= 500) {
+      fps = fCount * 1000 / (now - fMark);
+      fCount = 0;
+      fMark = now;
+      fpsReal.textContent = fps.toFixed(1) + ' fps';
+    }
+  }
+
+  /* ---------- 交互 ---------- */
+  function setPlaying(v) {
+    playing = v;
+    btn.textContent = v ? '⏸ 暂停音乐' : '▶ 播放音乐';
+    badge.textContent = v ? '忙碌 · 60fps' : '空闲 · 30fps';
+    badge.classList.toggle('busy', v);
+  }
+  btn.addEventListener('click', function () { setPlaying(!playing); });
+  peakEl.addEventListener('input', function () { peakVal.textContent = parseFloat(peakEl.value).toFixed(2); });
+
+  function hit(e) {
+    const r = cv.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (W / r.width);
+    const y = (e.clientY - r.top) * (CH / r.height);
+    return x >= L - 2 && x <= R + 2 && y >= 0 && y <= CAP_H + 2;
+  }
+  cv.addEventListener('pointerdown', function (e) { if (hit(e)) setPlaying(!playing); });
+  cv.addEventListener('pointermove', function (e) {
+    hover = hit(e);
+    cv.style.cursor = hover ? 'pointer' : 'default';
+  });
+  cv.addEventListener('pointerleave', function () {
+    hover = false;
+    cv.style.cursor = 'default';
+  });
+
+  setPlaying(false);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
